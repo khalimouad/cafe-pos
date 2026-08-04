@@ -69,6 +69,7 @@ input, select { font: inherit; }
   font-size: 13px; color: var(--muted); white-space: nowrap;
 }
 .chip b { color: var(--text); }
+.chip.warn { color: #ffcf8d; border-color: rgba(255, 176, 114, 0.4); background: rgba(255, 138, 61, 0.12); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
 .dot.off { background: var(--red); }
 
@@ -243,6 +244,7 @@ table.simple tr:last-child td { border-bottom: none; }
   background: var(--green); color: #04180d; padding: 13px 22px; border-radius: 999px;
   font-weight: 700; box-shadow: var(--shadow); z-index: 60; max-width: 92vw; text-align: center;
 }
+.toast.bad { background: var(--red); color: #fff; }
 
 .bottom-nav { display: none; }
 

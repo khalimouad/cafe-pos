@@ -6,7 +6,7 @@ import { useI18n } from '../lib/i18n'
 type Props = {
   products: Product[]
   currency: string
-  onCheckout: (lines: OrderLine[]) => void
+  onCheckout: (lines: OrderLine[]) => Promise<void>
 }
 
 export default function Pos({ products, currency, onCheckout }: Props) {
@@ -17,6 +17,7 @@ export default function Pos({ products, currency, onCheckout }: Props) {
   const [cat, setCat] = useState<string | null>(null)
   const [lines, setLines] = useState<OrderLine[]>([])
   const [sheet, setSheet] = useState(false)
+  const [sending, setSending] = useState(false)
 
   const shown = cat === null ? actives : actives.filter((p) => p.category === cat)
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0)
@@ -41,11 +42,19 @@ export default function Pos({ products, currency, onCheckout }: Props) {
         .filter((l) => l.qty > 0),
     )
 
-  const validate = () => {
-    if (!lines.length) return
-    onCheckout(lines)
-    setLines([])
-    setSheet(false)
+  // Le panier n'est vidé qu'une fois la commande enregistrée en base.
+  const validate = async () => {
+    if (!lines.length || sending) return
+    setSending(true)
+    try {
+      await onCheckout(lines)
+      setLines([])
+      setSheet(false)
+    } catch {
+      // L'erreur est déjà signalée par l'écran principal : on garde le panier.
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -115,7 +124,7 @@ export default function Pos({ products, currency, onCheckout }: Props) {
             <span className="lbl">{t('cart_items', { n: count })}</span>
             <span className="val">{money(total, currency)}</span>
           </div>
-          <button className="btn primary block pay" disabled={!lines.length} onClick={validate}>
+          <button className="btn primary block pay" disabled={!lines.length || sending} onClick={() => void validate()}>
             {t('pay_btn')}
           </button>
         </div>
@@ -128,7 +137,7 @@ export default function Pos({ products, currency, onCheckout }: Props) {
           <span className="v">{money(total, currency)}</span>
           <span className="m">{t('cart_view')}</span>
         </button>
-        <button className="btn primary pay" disabled={!lines.length} onClick={validate}>
+        <button className="btn primary pay" disabled={!lines.length || sending} onClick={() => void validate()}>
           {t('pay_btn')}
         </button>
       </div>

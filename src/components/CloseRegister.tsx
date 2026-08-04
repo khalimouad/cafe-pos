@@ -8,11 +8,12 @@ type Props = {
   orders: Order[]
   shop: Shop
   cashierName: string
+  busy: boolean
   onCancel: () => void
   onClose: (countedCash: number) => void
 }
 
-export default function CloseRegister({ session, orders, shop, cashierName, onCancel, onClose }: Props) {
+export default function CloseRegister({ session, orders, shop, cashierName, busy, onCancel, onClose }: Props) {
   const { t } = useI18n()
   const sales = orders.reduce((s, o) => s + o.total, 0)
   const expected = session.openingFloat + sales
@@ -23,10 +24,11 @@ export default function CloseRegister({ session, orders, shop, cashierName, onCa
   const perCashier = useMemo(() => {
     const map = new Map<string, { name: string; count: number; total: number }>()
     orders.forEach((o) => {
-      const e = map.get(o.cashierId) ?? { name: o.cashierName, count: 0, total: 0 }
+      const key = o.cashierId ?? o.cashierName
+      const e = map.get(key) ?? { name: o.cashierName, count: 0, total: 0 }
       e.count += 1
       e.total += o.total
-      map.set(o.cashierId, e)
+      map.set(key, e)
     })
     return Array.from(map.values()).sort((a, b) => b.total - a.total)
   }, [orders])
@@ -95,7 +97,7 @@ export default function CloseRegister({ session, orders, shop, cashierName, onCa
 
         <div className="actions">
           <button className="btn ghost" onClick={onCancel}>{t('cancel')}</button>
-          <button className="btn danger grow" onClick={() => onClose(countedNum)}>
+          <button className="btn danger grow" disabled={busy} onClick={() => onClose(countedNum)}>
             {t('close_btn')}
           </button>
         </div>

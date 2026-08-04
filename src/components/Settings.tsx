@@ -1,60 +1,71 @@
 import { useState } from 'react'
 import type { DB, Cashier, Product } from '../lib/types'
-import { money, uid } from '../lib/store'
+import { money, type Actions } from '../lib/store'
 import { useI18n } from '../lib/i18n'
 
 type Props = {
   db: DB
-  update: (fn: (draft: DB) => DB) => void
+  store: Actions & { reload: () => Promise<void> }
 }
 
-export default function Settings({ db, update }: Props) {
+export default function Settings({ db, store }: Props) {
   const { t } = useI18n()
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: '', emoji: '☕' })
   const [newCashier, setNewCashier] = useState({ name: '', pin: '' })
+  const [pins, setPins] = useState<Record<string, string>>({})
+  const [error, setError] = useState('')
 
-  const addProduct = () => {
-    const price = Number(newProduct.price.replace(',', '.'))
-    if (!newProduct.name.trim() || !price) return
-    update((d) => ({
-      ...d,
-      products: [
-        ...d.products,
-        {
-          id: uid(),
-          name: newProduct.name.trim(),
-          price,
-          category: newProduct.category.trim() || 'Divers',
-          emoji: newProduct.emoji || '🍽️',
-          active: true,
-        },
-      ],
-    }))
-    setNewProduct({ name: '', price: '', category: '', emoji: '☕' })
+  const run = async (fn: () => Promise<void>) => {
+    setError('')
+    try {
+      await fn()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
 
-  const patchProduct = (id: string, patch: Partial<Product>) =>
-    update((d) => ({ ...d, products: d.products.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
+  const addProduct = () =>
+    run(async () => {
+      const price = Number(newProduct.price.replace(',', '.'))
+      if (!newProduct.name.trim() || !price) return
+      await store.addProduct({
+        name: newProduct.name.trim(),
+        price,
+        category: newProduct.category.trim() || 'Divers',
+        emoji: newProduct.emoji || '🍽️',
+      })
+      setNewProduct({ name: '', price: '', category: '', emoji: '☕' })
+    })
 
-  const addCashier = () => {
-    if (!newCashier.name.trim() || newCashier.pin.length !== 4) return
-    update((d) => ({
-      ...d,
-      cashiers: [...d.cashiers, { id: uid(), name: newCashier.name.trim(), pin: newCashier.pin, admin: false }],
-    }))
-    setNewCashier({ name: '', pin: '' })
-  }
+  const patchProduct = (id: string, patch: Partial<Product>) => run(() => store.updateProduct(id, patch))
 
-  const removeCashier = (c: Cashier) => {
-    if (db.cashiers.length <= 1) return
-    if (!confirm(t('set_confirm_delete', { name: c.name }))) return
-    update((d) => ({ ...d, cashiers: d.cashiers.filter((x) => x.id !== c.id) }))
-  }
+  const addCashier = () =>
+    run(async () => {
+      if (!newCashier.name.trim() || newCashier.pin.length !== 4) return
+      await store.addCashier(newCashier.name.trim(), newCashier.pin)
+      setNewCashier({ name: '', pin: '' })
+    })
+
+  const savePin = (c: Cashier) =>
+    run(async () => {
+      const pin = pins[c.id] ?? ''
+      if (pin.length !== 4) return
+      await store.setCashierPin(c.id, pin)
+      setPins({ ...pins, [c.id]: '' })
+    })
+
+  const removeCashier = (c: Cashier) =>
+    run(async () => {
+      if (db.cashiers.length <= 1) return
+      if (!confirm(t('set_confirm_delete', { name: c.name }))) return
+      await store.removeCashier(c.id)
+    })
 
   return (
     <div className="page">
       <h1>{t('set_title')}</h1>
       <p className="sub">{t('set_sub')}</p>
+      {error && <p className="error">{error}</p>}
 
       <h2 className="section">{t('set_shop')}</h2>
       <div className="list pad" style={{ marginBottom: 28 }}>
@@ -70,8 +81,10 @@ export default function Settings({ db, update }: Props) {
               <label>{label}</label>
               <input
                 className="input"
-                value={db.shop[key]}
-                onChange={(e) => update((d) => ({ ...d, shop: { ...d.shop, [key]: e.target.value } }))}
+                defaultValue={db.shop[key]}
+                onBlur={(e) => {
+                  if (e.target.value !== db.shop[key]) void run(() => store.updateShop({ [key]: e.target.value }))
+                }}
               />
             </div>
           ))}
@@ -95,12 +108,15 @@ export default function Settings({ db, update }: Props) {
                     className="input tiny"
                     dir="ltr"
                     inputMode="decimal"
-                    value={String(p.price)}
-                    onChange={(e) => patchProduct(p.id, { price: Number(e.target.value.replace(',', '.')) || 0 })}
+                    defaultValue={String(p.price)}
+                    onBlur={(e) => {
+                      const price = Number(e.target.value.replace(',', '.'))
+                      if (Number.isFinite(price) && price !== p.price) void patchProduct(p.id, { price })
+                    }}
                   />
                 </td>
                 <td>
-                  <button className="btn ghost small" onClick={() => patchProduct(p.id, { active: !p.active })}>
+                  <button className="btn ghost small" onClick={() => void patchProduct(p.id, { active: !p.active })}>
                     {p.active ? t('yes') : t('no')}
                   </button>
                 </td>
@@ -130,34 +146,42 @@ export default function Settings({ db, update }: Props) {
           <label>{t('set_price')}</label>
           <input className="input" dir="ltr" inputMode="decimal" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value.replace(/[^0-9.,]/g, '') })} />
         </div>
-        <button className="btn primary" onClick={addProduct}>{t('add')}</button>
+        <button className="btn primary" onClick={() => void addProduct()}>{t('add')}</button>
       </div>
 
       <h2 className="section">{t('set_cashiers')}</h2>
+      <p className="sub">{t('set_pin_hidden')}</p>
       <div className="list scroll-x" style={{ marginBottom: 16 }}>
         <table className="simple">
-          <thead><tr><th>{t('set_name')}</th><th>{t('set_code')}</th><th>{t('set_role')}</th><th></th></tr></thead>
+          <thead><tr><th>{t('set_name')}</th><th>{t('set_new_pin')}</th><th>{t('set_role')}</th><th></th></tr></thead>
           <tbody>
             {db.cashiers.map((c) => (
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td>
-                  <input
-                    className="input tiny"
-                    dir="ltr"
-                    style={{ letterSpacing: 3 }}
-                    inputMode="numeric"
-                    value={c.pin}
-                    maxLength={4}
-                    onChange={(e) => {
-                      const pin = e.target.value.replace(/\D/g, '').slice(0, 4)
-                      update((d) => ({ ...d, cashiers: d.cashiers.map((x) => (x.id === c.id ? { ...x, pin } : x)) }))
-                    }}
-                  />
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      className="input tiny"
+                      dir="ltr"
+                      style={{ letterSpacing: 3 }}
+                      inputMode="numeric"
+                      placeholder="••••"
+                      value={pins[c.id] ?? ''}
+                      maxLength={4}
+                      onChange={(e) => setPins({ ...pins, [c.id]: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    />
+                    <button
+                      className="btn ghost small"
+                      disabled={(pins[c.id] ?? '').length !== 4}
+                      onClick={() => void savePin(c)}
+                    >
+                      {t('save')}
+                    </button>
+                  </div>
                 </td>
                 <td style={{ color: 'var(--muted)' }}>{c.admin ? t('role_manager') : t('role_cashier')}</td>
                 <td>
-                  <button className="btn danger small" onClick={() => removeCashier(c)}>{t('delete')}</button>
+                  <button className="btn danger small" onClick={() => void removeCashier(c)}>{t('delete')}</button>
                 </td>
               </tr>
             ))}
@@ -180,7 +204,7 @@ export default function Settings({ db, update }: Props) {
             onChange={(e) => setNewCashier({ ...newCashier, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
           />
         </div>
-        <button className="btn primary" onClick={addCashier}>{t('add')}</button>
+        <button className="btn primary" onClick={() => void addCashier()}>{t('add')}</button>
       </div>
 
       <p className="sub" style={{ marginTop: 24 }}>

@@ -1,7 +1,6 @@
 export type Cashier = {
   id: string
   name: string
-  pin: string
   admin: boolean
 }
 
@@ -25,7 +24,7 @@ export type Order = {
   id: string
   number: number
   sessionId: string
-  cashierId: string
+  cashierId: string | null
   cashierName: string
   createdAt: string
   lines: OrderLine[]
@@ -56,5 +55,4 @@ export type DB = {
   products: Product[]
   sessions: Session[]
   orders: Order[]
-  orderCounter: number
 }

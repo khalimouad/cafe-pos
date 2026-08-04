@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Login from './components/Login'
 import OpenRegister from './components/OpenRegister'
 import Pos from './components/Pos'
@@ -6,19 +6,21 @@ import History from './components/History'
 import CloseRegister from './components/CloseRegister'
 import Settings from './components/Settings'
 import LangSwitch from './components/LangSwitch'
-import { money, timeFR, uid, useDB } from './lib/store'
+import { money, timeFR, useDB } from './lib/store'
 import { printTicket, printZReport } from './lib/print'
 import { useI18n, type T } from './lib/i18n'
-import type { Cashier, Order, OrderLine } from './lib/types'
+import type { Cashier, OrderLine } from './lib/types'
 
 type Tab = 'caisse' | 'historique' | 'reglages'
 
 export default function App() {
-  const { db, update } = useDB()
+  const store = useDB()
+  const { db, ready, error, reload } = store
   const { t } = useI18n()
   const [cashier, setCashier] = useState<Cashier | null>(null)
   const [tab, setTab] = useState<Tab>('caisse')
   const [closing, setClosing] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
 
   const openSession = useMemo(() => db.sessions.find((s) => !s.closedAt) ?? null, [db.sessions])
@@ -29,39 +31,65 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return
-    const t2 = setTimeout(() => setToast(''), 2200)
-    return () => clearTimeout(t2)
+    const timer = setTimeout(() => setToast(''), 2600)
+    return () => clearTimeout(timer)
   }, [toast])
 
-  // Le caissier connecté a pu être supprimé depuis les réglages.
+  // Le caissier connecté a pu être supprimé depuis un autre appareil.
   useEffect(() => {
-    if (cashier && !db.cashiers.some((c) => c.id === cashier.id)) setCashier(null)
-  }, [db.cashiers, cashier])
+    if (ready && cashier && !db.cashiers.some((c) => c.id === cashier.id)) setCashier(null)
+  }, [db.cashiers, cashier, ready])
+
+  const fail = (e: unknown) => setToast(`⚠️ ${e instanceof Error ? e.message : String(e)}`)
+
+  if (!ready) {
+    return (
+      <div className="screen">
+        <div className="panel" style={{ textAlign: 'center' }}>
+          <h1>☕</h1>
+          <p className="sub" style={{ margin: 0 }}>{t('loading')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !db.products.length) {
+    return (
+      <div className="screen">
+        <div className="panel">
+          <h1>{t('offline_title')}</h1>
+          <p className="sub">{t('offline_sub')}</p>
+          <p className="error">{error}</p>
+          <button className="btn primary block" onClick={() => void reload()}>{t('retry')}</button>
+        </div>
+      </div>
+    )
+  }
 
   if (!cashier) {
-    return <Login cashiers={db.cashiers} shopName={db.shop.name} onLogin={setCashier} />
+    return (
+      <Login
+        cashiers={db.cashiers}
+        shopName={db.shop.name}
+        verifyPin={store.verifyPin}
+        onLogin={setCashier}
+      />
+    )
   }
 
-  const handleOpen = (openingFloat: number) => {
-    update((d) => ({
-      ...d,
-      sessions: [
-        ...d.sessions,
-        {
-          id: uid(),
-          openedAt: new Date().toISOString(),
-          openedBy: cashier.name,
-          openingFloat,
-          closedAt: null,
-          closedBy: null,
-          countedCash: null,
-        },
-      ],
-    }))
-    setToast(t('toast_opened'))
+  const handleOpen = async (openingFloat: number) => {
+    setBusy(true)
+    try {
+      await store.openSession(cashier.name, openingFloat)
+      setToast(t('toast_opened'))
+    } catch (e) {
+      fail(e)
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const chrome = (content: JSX.Element, sessionOpen: boolean, sessionTotal = 0) => (
+  const chrome = (content: ReactNode, sessionOpen: boolean, sessionTotal = 0) => (
     <div className="app">
       <Topbar
         t={t}
@@ -74,6 +102,7 @@ export default function App() {
         currency={db.shop.currency}
         onCloseRegister={() => setClosing(true)}
         openedAt={openSession?.openedAt}
+        offline={Boolean(error)}
       />
       <div className="main">{content}</div>
       <BottomNav
@@ -84,7 +113,7 @@ export default function App() {
         sessionOpen={sessionOpen}
         onCloseRegister={() => setClosing(true)}
       />
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className={`toast${toast.startsWith('⚠️') ? ' bad' : ''}`}>{toast}</div>}
     </div>
   )
 
@@ -93,48 +122,54 @@ export default function App() {
       tab === 'historique' ? (
         <History orders={db.orders} sessions={db.sessions} cashiers={db.cashiers} shop={db.shop} currentSessionId={null} />
       ) : tab === 'reglages' && cashier.admin ? (
-        <Settings db={db} update={update} />
+        <Settings db={db} store={store} />
       ) : (
-        <OpenRegister cashierName={cashier.name} currency={db.shop.currency} onOpen={handleOpen} />
+        <OpenRegister cashierName={cashier.name} currency={db.shop.currency} busy={busy} onOpen={handleOpen} />
       ),
       false,
     )
   }
 
-  const checkout = (lines: OrderLine[]) => {
+  const checkout = async (lines: OrderLine[]) => {
     const total = lines.reduce((s, l) => s + l.price * l.qty, 0)
-    const order: Order = {
-      id: uid(),
-      number: db.orderCounter + 1,
-      sessionId: openSession.id,
-      cashierId: cashier.id,
-      cashierName: cashier.name,
-      createdAt: new Date().toISOString(),
-      lines,
-      total,
+    try {
+      const order = await store.createOrder({ sessionId: openSession.id, cashier, lines, total })
+      printTicket(order, db.shop)
+      setToast(t('toast_paid', { amount: money(total, db.shop.currency), n: order.number }))
+    } catch (e) {
+      fail(e)
+      throw e
     }
-    update((d) => ({ ...d, orders: [...d.orders, order], orderCounter: d.orderCounter + 1 }))
-    printTicket(order, db.shop)
-    setToast(t('toast_paid', { amount: money(total, db.shop.currency), n: order.number }))
   }
 
-  const closeRegister = (countedCash: number) => {
-    const closedAt = new Date().toISOString()
-    const closed = { ...openSession, closedAt, closedBy: cashier.name, countedCash }
+  const closeRegister = async (countedCash: number) => {
+    setBusy(true)
+    try {
+      await store.closeSession(openSession.id, cashier.name, countedCash)
 
-    const map = new Map<string, { name: string; count: number; total: number }>()
-    sessionOrders.forEach((o) => {
-      const e = map.get(o.cashierId) ?? { name: o.cashierName, count: 0, total: 0 }
-      e.count += 1
-      e.total += o.total
-      map.set(o.cashierId, e)
-    })
+      const map = new Map<string, { name: string; count: number; total: number }>()
+      sessionOrders.forEach((o) => {
+        const key = o.cashierId ?? o.cashierName
+        const e = map.get(key) ?? { name: o.cashierName, count: 0, total: 0 }
+        e.count += 1
+        e.total += o.total
+        map.set(key, e)
+      })
 
-    update((d) => ({ ...d, sessions: d.sessions.map((s) => (s.id === closed.id ? closed : s)) }))
-    printZReport(closed, sessionOrders, db.shop, Array.from(map.values()))
-    setClosing(false)
-    setTab('caisse')
-    setToast(t('toast_closed'))
+      printZReport(
+        { ...openSession, closedAt: new Date().toISOString(), closedBy: cashier.name, countedCash },
+        sessionOrders,
+        db.shop,
+        Array.from(map.values()),
+      )
+      setClosing(false)
+      setTab('caisse')
+      setToast(t('toast_closed'))
+    } catch (e) {
+      fail(e)
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (closing) {
@@ -146,10 +181,12 @@ export default function App() {
             orders={sessionOrders}
             shop={db.shop}
             cashierName={cashier.name}
+            busy={busy}
             onCancel={() => setClosing(false)}
             onClose={closeRegister}
           />
         </div>
+        {toast && <div className={`toast${toast.startsWith('⚠️') ? ' bad' : ''}`}>{toast}</div>}
       </div>
     )
   }
@@ -168,7 +205,7 @@ export default function App() {
           currentSessionId={openSession.id}
         />
       )}
-      {tab === 'reglages' && cashier.admin && <Settings db={db} update={update} />}
+      {tab === 'reglages' && cashier.admin && <Settings db={db} store={store} />}
     </>,
     true,
     sessionTotal,
@@ -186,6 +223,7 @@ function Topbar({
   currency,
   onCloseRegister,
   openedAt,
+  offline,
 }: {
   t: T
   cashier: Cashier
@@ -197,6 +235,7 @@ function Topbar({
   currency: string
   onCloseRegister: () => void
   openedAt?: string
+  offline: boolean
 }) {
   return (
     <header className="topbar">
@@ -214,6 +253,8 @@ function Topbar({
       </nav>
 
       <div className="spacer" />
+
+      {offline && <span className="chip warn">{t('offline_chip')}</span>}
 
       <span className="chip">
         <span className={`dot${sessionOpen ? '' : ' off'}`} />

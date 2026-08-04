@@ -5,12 +5,13 @@ import { useI18n } from '../lib/i18n'
 type Props = {
   cashierName: string
   currency: string
+  busy: boolean
   onOpen: (openingFloat: number) => void
 }
 
 const PRESETS = [0, 100, 200, 500]
 
-export default function OpenRegister({ cashierName, currency, onOpen }: Props) {
+export default function OpenRegister({ cashierName, currency, busy, onOpen }: Props) {
   const { t } = useI18n()
   const [value, setValue] = useState('200')
   const amount = Number(value.replace(',', '.')) || 0
@@ -41,7 +42,7 @@ export default function OpenRegister({ cashierName, currency, onOpen }: Props) {
           ))}
         </div>
 
-        <button className="btn primary block pay" onClick={() => onOpen(amount)}>
+        <button className="btn primary block pay" disabled={busy} onClick={() => onOpen(amount)}>
           {t('open_btn')}
         </button>
       </div>

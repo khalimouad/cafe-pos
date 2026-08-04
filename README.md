@@ -14,8 +14,13 @@ npm run dev      # http://localhost:5173
 npm run build    # version de production dans dist/
 ```
 
-Aucune base de données ni serveur : tout est enregistré dans le navigateur du poste
-(localStorage). Le poste garde donc son historique même après fermeture du navigateur.
+Les données vivent dans **Supabase** (PostgreSQL) : le poste de caisse, le téléphone du
+gérant et n'importe quel autre appareil voient la même caisse, en temps réel. Les clés
+sont dans `.env` (voir `.env.example`) ; la clé publiable est faite pour être exposée
+au navigateur, la sécurité est assurée en base par RLS.
+
+Le schéma est versionné dans `supabase/migrations/0001_cafe_pos.sql`. Les tables sont
+préfixées `cafe_` car le projet Supabase héberge aussi le POS de la boucherie.
 
 ## Codes par défaut
 
@@ -26,6 +31,10 @@ Aucune base de données ni serveur : tout est enregistré dans le navigateur du 
 | Karim    | 3333 | Caissier |
 
 À changer dans **Réglages → Caissiers** dès la mise en service.
+
+Les codes ne sont **jamais lisibles** depuis le navigateur : ils restent en base et sont
+vérifiés par la fonction `cafe_verify_pin`. Après 5 essais ratés, le profil est bloqué
+60 secondes. Dans les réglages, on ne peut donc que *remplacer* un code, pas le lire.
 
 ## Fonctionnement
 
@@ -54,6 +63,22 @@ Aucune base de données ni serveur : tout est enregistré dans le navigateur du 
 Le bouton **FR / دارجة** change toute l'interface *et* le ticket imprimé.
 Le choix est mémorisé sur le poste. En darija l'affichage passe en RTL, mais les
 montants, dates et codes restent lus de gauche à droite.
+
+## Base de données
+
+| Table | Contenu |
+|-------|---------|
+| `cafe_shop` | nom, adresse, téléphone, devise, bas de ticket |
+| `cafe_cashiers` | caissiers + code (jamais exposé) ; vue `cafe_cashiers_public` sans le code |
+| `cafe_products` | la carte |
+| `cafe_sessions` | ouvertures/fermetures de caisse (index unique : une seule caisse ouverte) |
+| `cafe_orders` | commandes payées, numérotées par séquence, lignes en JSON |
+| `cafe_pin_attempts` | compteur d'essais de code, pour le blocage temporaire |
+
+L'application se resynchronise en temps réel (Realtime) et, en secours, toutes les
+60 secondes. Si la base est injoignable, un bandeau « Hors ligne » s'affiche : la vente
+est bloquée tant que la commande ne peut pas être enregistrée, pour ne jamais imprimer
+un ticket qui n'existe pas en base.
 
 ## Réglages (responsable)
 

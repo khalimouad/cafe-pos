@@ -38,10 +38,11 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
   const perCashier = useMemo(() => {
     const map = new Map<string, { name: string; count: number; total: number }>()
     filtered.forEach((o) => {
-      const e = map.get(o.cashierId) ?? { name: o.cashierName, count: 0, total: 0 }
+      const key = o.cashierId ?? o.cashierName
+      const e = map.get(key) ?? { name: o.cashierName, count: 0, total: 0 }
       e.count += 1
       e.total += o.total
-      map.set(o.cashierId, e)
+      map.set(key, e)
     })
     return Array.from(map.values()).sort((a, b) => b.total - a.total)
   }, [filtered])

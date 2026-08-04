@@ -6,27 +6,36 @@ import LangSwitch from './LangSwitch'
 type Props = {
   cashiers: Cashier[]
   shopName: string
+  verifyPin: (cashierId: string, pin: string) => Promise<boolean>
   onLogin: (c: Cashier) => void
 }
 
-export default function Login({ cashiers, shopName, onLogin }: Props) {
+export default function Login({ cashiers, shopName, verifyPin, onLogin }: Props) {
   const { t } = useI18n()
   const [selected, setSelected] = useState<Cashier | null>(null)
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [checking, setChecking] = useState(false)
 
-  const press = (d: string) => {
-    if (pin.length >= 4) return
+  const press = async (d: string) => {
+    if (pin.length >= 4 || checking) return
     const next = pin + d
     setPin(next)
     setError('')
-    if (next.length === 4 && selected) {
-      if (next === selected.pin) {
+    if (next.length < 4 || !selected) return
+
+    setChecking(true)
+    try {
+      if (await verifyPin(selected.id, next)) {
         onLogin(selected)
-      } else {
-        setError(t('login_wrong'))
-        setTimeout(() => setPin(''), 350)
+        return
       }
+      setError(t('login_wrong'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setChecking(false)
+      setTimeout(() => setPin(''), 300)
     }
   }
 
@@ -55,10 +64,10 @@ export default function Login({ cashiers, shopName, onLogin }: Props) {
             {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
             <div className="keypad">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-                <button key={d} onClick={() => press(d)}>{d}</button>
+                <button key={d} onClick={() => void press(d)}>{d}</button>
               ))}
               <button onClick={() => setPin('')}>C</button>
-              <button onClick={() => press('0')}>0</button>
+              <button onClick={() => void press('0')}>0</button>
               <button onClick={() => setPin(pin.slice(0, -1))}>⌫</button>
             </div>
             <button className="btn ghost block" onClick={() => { setSelected(null); setPin(''); setError('') }}>
