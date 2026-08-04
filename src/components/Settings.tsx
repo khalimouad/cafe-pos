@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { DB, Cashier, Product } from '../lib/types'
 import { money, uid } from '../lib/store'
+import { useI18n } from '../lib/i18n'
 
 type Props = {
   db: DB
@@ -8,6 +9,7 @@ type Props = {
 }
 
 export default function Settings({ db, update }: Props) {
+  const { t } = useI18n()
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: '', emoji: '☕' })
   const [newCashier, setNewCashier] = useState({ name: '', pin: '' })
 
@@ -45,24 +47,24 @@ export default function Settings({ db, update }: Props) {
 
   const removeCashier = (c: Cashier) => {
     if (db.cashiers.length <= 1) return
-    if (!confirm(`Supprimer le caissier ${c.name} ?`)) return
+    if (!confirm(t('set_confirm_delete', { name: c.name }))) return
     update((d) => ({ ...d, cashiers: d.cashiers.filter((x) => x.id !== c.id) }))
   }
 
   return (
     <div className="page">
-      <h1>Réglages</h1>
-      <p className="sub">Carte, caissiers et informations imprimées sur le ticket.</p>
+      <h1>{t('set_title')}</h1>
+      <p className="sub">{t('set_sub')}</p>
 
-      <h2 style={{ fontSize: 16, margin: '0 0 12px' }}>Établissement</h2>
-      <div className="list" style={{ marginBottom: 28, padding: 18 }}>
+      <h2 className="section">{t('set_shop')}</h2>
+      <div className="list pad" style={{ marginBottom: 28 }}>
         <div className="stats" style={{ margin: 0 }}>
           {([
-            ['name', 'Nom'],
-            ['address', 'Adresse'],
-            ['phone', 'Téléphone'],
-            ['currency', 'Devise'],
-            ['footer', 'Message de bas de ticket'],
+            ['name', t('set_name')],
+            ['address', t('set_address')],
+            ['phone', t('set_phone')],
+            ['currency', t('set_currency')],
+            ['footer', t('set_footer')],
           ] as const).map(([key, label]) => (
             <div className="field" key={key} style={{ margin: 0 }}>
               <label>{label}</label>
@@ -76,11 +78,11 @@ export default function Settings({ db, update }: Props) {
         </div>
       </div>
 
-      <h2 style={{ fontSize: 16, margin: '0 0 12px' }}>Carte ({db.products.length} produits)</h2>
-      <div className="list" style={{ marginBottom: 16 }}>
+      <h2 className="section">{t('set_menu', { n: db.products.length })}</h2>
+      <div className="list scroll-x" style={{ marginBottom: 16 }}>
         <table className="simple">
           <thead>
-            <tr><th></th><th>Produit</th><th>Catégorie</th><th>Prix</th><th>Visible</th></tr>
+            <tr><th></th><th>{t('set_product')}</th><th>{t('set_category')}</th><th>{t('set_price')}</th><th>{t('set_visible')}</th></tr>
           </thead>
           <tbody>
             {db.products.map((p) => (
@@ -90,15 +92,16 @@ export default function Settings({ db, update }: Props) {
                 <td style={{ color: 'var(--muted)' }}>{p.category}</td>
                 <td>
                   <input
-                    className="input"
-                    style={{ width: 100, padding: '6px 10px' }}
+                    className="input tiny"
+                    dir="ltr"
+                    inputMode="decimal"
                     value={String(p.price)}
                     onChange={(e) => patchProduct(p.id, { price: Number(e.target.value.replace(',', '.')) || 0 })}
                   />
                 </td>
                 <td>
-                  <button className="btn ghost" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => patchProduct(p.id, { active: !p.active })}>
-                    {p.active ? 'Oui' : 'Non'}
+                  <button className="btn ghost small" onClick={() => patchProduct(p.id, { active: !p.active })}>
+                    {p.active ? t('yes') : t('no')}
                   </button>
                 </td>
               </tr>
@@ -107,41 +110,43 @@ export default function Settings({ db, update }: Props) {
         </table>
       </div>
 
-      <div className="list" style={{ marginBottom: 28, padding: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="field" style={{ margin: 0, width: 70 }}>
-          <label>Icône</label>
+      <div className="list pad form-row" style={{ marginBottom: 28 }}>
+        <div className="field" style={{ margin: 0, width: 76 }}>
+          <label>{t('set_icon')}</label>
           <input className="input" value={newProduct.emoji} onChange={(e) => setNewProduct({ ...newProduct, emoji: e.target.value })} />
         </div>
-        <div className="field" style={{ margin: 0, flex: 2, minWidth: 160 }}>
-          <label>Nom du produit</label>
+        <div className="field" style={{ margin: 0, flex: 2, minWidth: 150 }}>
+          <label>{t('set_product_name')}</label>
           <input className="input" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
         </div>
-        <div className="field" style={{ margin: 0, flex: 1, minWidth: 140 }}>
-          <label>Catégorie</label>
+        <div className="field" style={{ margin: 0, flex: 1, minWidth: 130 }}>
+          <label>{t('set_category')}</label>
           <input className="input" list="cats" value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} />
           <datalist id="cats">
             {Array.from(new Set(db.products.map((p) => p.category))).map((c) => <option key={c} value={c} />)}
           </datalist>
         </div>
         <div className="field" style={{ margin: 0, width: 110 }}>
-          <label>Prix</label>
-          <input className="input" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value.replace(/[^0-9.,]/g, '') })} />
+          <label>{t('set_price')}</label>
+          <input className="input" dir="ltr" inputMode="decimal" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value.replace(/[^0-9.,]/g, '') })} />
         </div>
-        <button className="btn primary" onClick={addProduct}>Ajouter</button>
+        <button className="btn primary" onClick={addProduct}>{t('add')}</button>
       </div>
 
-      <h2 style={{ fontSize: 16, margin: '0 0 12px' }}>Caissiers</h2>
-      <div className="list" style={{ marginBottom: 16 }}>
+      <h2 className="section">{t('set_cashiers')}</h2>
+      <div className="list scroll-x" style={{ marginBottom: 16 }}>
         <table className="simple">
-          <thead><tr><th>Nom</th><th>Code</th><th>Rôle</th><th></th></tr></thead>
+          <thead><tr><th>{t('set_name')}</th><th>{t('set_code')}</th><th>{t('set_role')}</th><th></th></tr></thead>
           <tbody>
             {db.cashiers.map((c) => (
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td>
                   <input
-                    className="input"
-                    style={{ width: 90, padding: '6px 10px', letterSpacing: 3 }}
+                    className="input tiny"
+                    dir="ltr"
+                    style={{ letterSpacing: 3 }}
+                    inputMode="numeric"
                     value={c.pin}
                     maxLength={4}
                     onChange={(e) => {
@@ -150,11 +155,9 @@ export default function Settings({ db, update }: Props) {
                     }}
                   />
                 </td>
-                <td style={{ color: 'var(--muted)' }}>{c.admin ? 'Responsable' : 'Caissier'}</td>
+                <td style={{ color: 'var(--muted)' }}>{c.admin ? t('role_manager') : t('role_cashier')}</td>
                 <td>
-                  <button className="btn danger" style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => removeCashier(c)}>
-                    Supprimer
-                  </button>
+                  <button className="btn danger small" onClick={() => removeCashier(c)}>{t('delete')}</button>
                 </td>
               </tr>
             ))}
@@ -162,24 +165,29 @@ export default function Settings({ db, update }: Props) {
         </table>
       </div>
 
-      <div className="list" style={{ padding: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="field" style={{ margin: 0, flex: 1, minWidth: 180 }}>
-          <label>Nom du caissier</label>
+      <div className="list pad form-row">
+        <div className="field" style={{ margin: 0, flex: 1, minWidth: 170 }}>
+          <label>{t('set_cashier_name')}</label>
           <input className="input" value={newCashier.name} onChange={(e) => setNewCashier({ ...newCashier, name: e.target.value })} />
         </div>
-        <div className="field" style={{ margin: 0, width: 130 }}>
-          <label>Code à 4 chiffres</label>
+        <div className="field" style={{ margin: 0, width: 140 }}>
+          <label>{t('set_pin')}</label>
           <input
             className="input"
+            dir="ltr"
+            inputMode="numeric"
             value={newCashier.pin}
             onChange={(e) => setNewCashier({ ...newCashier, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
           />
         </div>
-        <button className="btn primary" onClick={addCashier}>Ajouter</button>
+        <button className="btn primary" onClick={addCashier}>{t('add')}</button>
       </div>
 
       <p className="sub" style={{ marginTop: 24 }}>
-        Chiffre d’affaires total enregistré : {money(db.orders.reduce((s, o) => s + o.total, 0), db.shop.currency)} sur {db.orders.length} commandes.
+        {t('set_revenue', {
+          amount: money(db.orders.reduce((s, o) => s + o.total, 0), db.shop.currency),
+          n: db.orders.length,
+        })}
       </p>
     </div>
   )

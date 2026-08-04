@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Order, Session, Shop } from '../lib/types'
 import { dateFR, money } from '../lib/store'
+import { useI18n } from '../lib/i18n'
 
 type Props = {
   session: Session
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export default function CloseRegister({ session, orders, shop, cashierName, onCancel, onClose }: Props) {
+  const { t } = useI18n()
   const sales = orders.reduce((s, o) => s + o.total, 0)
   const expected = session.openingFloat + sales
   const [counted, setCounted] = useState(String(expected))
@@ -31,35 +33,35 @@ export default function CloseRegister({ session, orders, shop, cashierName, onCa
 
   return (
     <div className="screen">
-      <div className="panel" style={{ maxWidth: 560 }}>
-        <h1>Fermeture de caisse</h1>
+      <div className="panel wide">
+        <h1>{t('close_title')}</h1>
         <p className="sub">
-          Ouverte le {dateFR(session.openedAt)} par {session.openedBy} · fermeture par {cashierName}
+          {t('close_sub', { date: dateFR(session.openedAt), opener: session.openedBy, closer: cashierName })}
         </p>
 
-        <div className="stats" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="stats two">
           <div className="stat">
-            <div className="k">Tickets</div>
+            <div className="k">{t('close_tickets')}</div>
             <div className="v">{orders.length}</div>
           </div>
           <div className="stat">
-            <div className="k">Ventes espèces</div>
+            <div className="k">{t('close_sales')}</div>
             <div className="v green">{money(sales, shop.currency)}</div>
           </div>
           <div className="stat">
-            <div className="k">Fond de caisse</div>
+            <div className="k">{t('close_float')}</div>
             <div className="v" style={{ fontSize: 20 }}>{money(session.openingFloat, shop.currency)}</div>
           </div>
           <div className="stat">
-            <div className="k">Attendu en caisse</div>
+            <div className="k">{t('close_expected')}</div>
             <div className="v" style={{ fontSize: 20 }}>{money(expected, shop.currency)}</div>
           </div>
         </div>
 
         {perCashier.length > 0 && (
-          <div className="list" style={{ marginBottom: 20 }}>
+          <div className="list scroll-x" style={{ marginBottom: 20 }}>
             <table className="simple">
-              <thead><tr><th>Caissier</th><th>Tickets</th><th>Total</th></tr></thead>
+              <thead><tr><th>{t('th_cashier')}</th><th>{t('close_tickets')}</th><th>{t('th_total')}</th></tr></thead>
               <tbody>
                 {perCashier.map((c) => (
                   <tr key={c.name}>
@@ -74,26 +76,27 @@ export default function CloseRegister({ session, orders, shop, cashierName, onCa
         )}
 
         <div className="field">
-          <label>Espèces comptées dans le tiroir ({shop.currency})</label>
+          <label>{t('close_counted', { currency: shop.currency })}</label>
           <input
             className="input big"
+            dir="ltr"
             inputMode="decimal"
             value={counted}
-            onChange={(e) => setCounted(e.target.value.replace(/[^0-9.,]/g, ''))}
+            onChange={(e) => setCounted(e.target.value.replace(/[^0-9.,-]/g, ''))}
           />
         </div>
 
         <div className="stat" style={{ marginBottom: 20 }}>
-          <div className="k">Écart</div>
+          <div className="k">{t('close_diff')}</div>
           <div className={`v ${diff === 0 ? '' : diff > 0 ? 'green' : 'red'}`}>
             {diff > 0 ? '+' : ''}{money(diff, shop.currency)}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn ghost" style={{ flex: 1 }} onClick={onCancel}>Annuler</button>
-          <button className="btn danger" style={{ flex: 2 }} onClick={() => onClose(countedNum)}>
-            Fermer la caisse &amp; imprimer le Z
+        <div className="actions">
+          <button className="btn ghost" onClick={onCancel}>{t('cancel')}</button>
+          <button className="btn danger grow" onClick={() => onClose(countedNum)}>
+            {t('close_btn')}
           </button>
         </div>
       </div>

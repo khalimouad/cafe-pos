@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { Cashier } from '../lib/types'
+import { useI18n } from '../lib/i18n'
+import LangSwitch from './LangSwitch'
 
 type Props = {
   cashiers: Cashier[]
@@ -8,6 +10,7 @@ type Props = {
 }
 
 export default function Login({ cashiers, shopName, onLogin }: Props) {
+  const { t } = useI18n()
   const [selected, setSelected] = useState<Cashier | null>(null)
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -21,7 +24,7 @@ export default function Login({ cashiers, shopName, onLogin }: Props) {
       if (next === selected.pin) {
         onLogin(selected)
       } else {
-        setError('Code incorrect')
+        setError(t('login_wrong'))
         setTimeout(() => setPin(''), 350)
       }
     }
@@ -30,10 +33,11 @@ export default function Login({ cashiers, shopName, onLogin }: Props) {
   return (
     <div className="screen">
       <div className="panel">
-        <h1>{shopName}</h1>
-        <p className="sub">
-          {selected ? `Bonjour ${selected.name}, saisissez votre code` : 'Choisissez votre profil caissier'}
-        </p>
+        <div className="panel-top">
+          <h1>{shopName}</h1>
+          <LangSwitch />
+        </div>
+        <p className="sub">{selected ? t('login_pin', { name: selected.name }) : t('login_pick')}</p>
 
         {!selected ? (
           <div className="users">
@@ -41,13 +45,13 @@ export default function Login({ cashiers, shopName, onLogin }: Props) {
               <button key={c.id} className="user" onClick={() => setSelected(c)}>
                 <span className="avatar">{c.name.slice(0, 2).toUpperCase()}</span>
                 <span className="nm">{c.name}</span>
-                <span className="rl">{c.admin ? 'Responsable' : 'Caissier'}</span>
+                <span className="rl">{c.admin ? t('role_manager') : t('role_cashier')}</span>
               </button>
             ))}
           </div>
         ) : (
           <>
-            <input className="input big" value={pin.replace(/./g, '•')} readOnly placeholder="••••" />
+            <input className="input big" dir="ltr" value={pin.replace(/./g, '•')} readOnly placeholder="••••" />
             {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
             <div className="keypad">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
@@ -55,10 +59,10 @@ export default function Login({ cashiers, shopName, onLogin }: Props) {
               ))}
               <button onClick={() => setPin('')}>C</button>
               <button onClick={() => press('0')}>0</button>
-              <button onClick={() => setPin(pin.slice(0, -1))}>←</button>
+              <button onClick={() => setPin(pin.slice(0, -1))}>⌫</button>
             </div>
             <button className="btn ghost block" onClick={() => { setSelected(null); setPin(''); setError('') }}>
-              Changer de caissier
+              {t('login_back')}
             </button>
           </>
         )}

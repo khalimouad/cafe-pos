@@ -1,10 +1,12 @@
 import type { Order, Session, Shop } from './types'
 import { dateFR, money } from './store'
+import { getLang, translate } from './i18n'
 
 const CSS = `
   @page { size: 80mm auto; margin: 4mm; }
   * { box-sizing: border-box; }
   body { font-family: "Courier New", monospace; font-size: 12px; color: #000; margin: 0; width: 72mm; }
+  body.rtl { font-family: "Noto Naskh Arabic", "Amiri", "Segoe UI", sans-serif; font-size: 13px; }
   h1 { font-size: 15px; text-align: center; margin: 0 0 2px; letter-spacing: 1px; }
   .center { text-align: center; }
   .muted { font-size: 11px; }
@@ -12,12 +14,13 @@ const CSS = `
   table { width: 100%; border-collapse: collapse; }
   td { padding: 1px 0; vertical-align: top; }
   td.qty { width: 26px; }
-  td.amt { text-align: right; white-space: nowrap; }
+  td.amt { text-align: end; white-space: nowrap; }
   .total { font-size: 15px; font-weight: bold; }
   .row { display: flex; justify-content: space-between; }
 `
 
 function send(title: string, body: string) {
+  const rtl = getLang() === 'ma'
   const frame = document.createElement('iframe')
   frame.setAttribute('aria-hidden', 'true')
   frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
@@ -26,7 +29,9 @@ function send(title: string, body: string) {
   const doc = frame.contentDocument
   if (!doc) return
   doc.open()
-  doc.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title}</title><style>${CSS}</style></head><body>${body}</body></html>`)
+  doc.write(
+    `<!doctype html><html lang="${rtl ? 'ar' : 'fr'}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>${title}</title><style>${CSS}</style></head><body class="${rtl ? 'rtl' : ''}">${body}</body></html>`,
+  )
   doc.close()
 
   const go = () => {
@@ -38,10 +43,12 @@ function send(title: string, body: string) {
   else frame.onload = () => setTimeout(go, 50)
 }
 
+const tp = (key: string, params?: Record<string, string | number>) => translate(getLang(), key, params)
+
 const head = (shop: Shop) => `
   <h1>${shop.name}</h1>
   <div class="center muted">${shop.address}</div>
-  <div class="center muted">Tél : ${shop.phone}</div>
+  <div class="center muted">${tp('tk_phone')} : <bdi>${shop.phone}</bdi></div>
   <div class="sep"></div>`
 
 export function printTicket(order: Order, shop: Shop) {
@@ -56,15 +63,15 @@ export function printTicket(order: Order, shop: Shop) {
     .join('')
 
   send(
-    `Ticket n°${order.number}`,
+    `${tp('tk_ticket_no')}${order.number}`,
     `${head(shop)}
-     <div class="row muted"><span>Ticket n° ${String(order.number).padStart(4, '0')}</span><span>${dateFR(order.createdAt)}</span></div>
-     <div class="muted">Caissier : ${order.cashierName}</div>
+     <div class="row muted"><span>${tp('tk_ticket_no')} <bdi>${String(order.number).padStart(4, '0')}</bdi></span><span>${dateFR(order.createdAt)}</span></div>
+     <div class="muted">${tp('tk_cashier')} : ${order.cashierName}</div>
      <div class="sep"></div>
      <table>${lines}</table>
      <div class="sep"></div>
-     <div class="row total"><span>TOTAL</span><span>${money(order.total, shop.currency)}</span></div>
-     <div class="row muted"><span>Règlement</span><span>ESPÈCES</span></div>
+     <div class="row total"><span>${tp('tk_total')}</span><span>${money(order.total, shop.currency)}</span></div>
+     <div class="row muted"><span>${tp('tk_payment')}</span><span>${tp('tk_cash')}</span></div>
      <div class="sep"></div>
      <div class="center muted">${shop.footer}</div>`,
   )
@@ -86,24 +93,24 @@ export function printZReport(
     .join('')
 
   send(
-    'Rapport de caisse',
+    tp('tk_z_title'),
     `${head(shop)}
-     <div class="center"><b>RAPPORT DE CAISSE (Z)</b></div>
+     <div class="center"><b>${tp('tk_z_title')}</b></div>
      <div class="sep"></div>
-     <div class="row muted"><span>Ouverture</span><span>${dateFR(session.openedAt)}</span></div>
-     <div class="row muted"><span>Fermeture</span><span>${dateFR(session.closedAt ?? new Date().toISOString())}</span></div>
-     <div class="row muted"><span>Ouverte par</span><span>${session.openedBy}</span></div>
-     <div class="row muted"><span>Fermée par</span><span>${session.closedBy ?? '-'}</span></div>
+     <div class="row muted"><span>${tp('tk_opened')}</span><span>${dateFR(session.openedAt)}</span></div>
+     <div class="row muted"><span>${tp('tk_closed')}</span><span>${dateFR(session.closedAt ?? new Date().toISOString())}</span></div>
+     <div class="row muted"><span>${tp('tk_opened_by')}</span><span>${session.openedBy}</span></div>
+     <div class="row muted"><span>${tp('tk_closed_by')}</span><span>${session.closedBy ?? '-'}</span></div>
      <div class="sep"></div>
-     <div class="row"><span>Nombre de tickets</span><span>${orders.length}</span></div>
-     <div class="row"><span>Fond de caisse</span><span>${money(session.openingFloat, shop.currency)}</span></div>
-     <div class="row"><span>Ventes espèces</span><span>${money(total, shop.currency)}</span></div>
+     <div class="row"><span>${tp('tk_count')}</span><span>${orders.length}</span></div>
+     <div class="row"><span>${tp('tk_float')}</span><span>${money(session.openingFloat, shop.currency)}</span></div>
+     <div class="row"><span>${tp('tk_sales')}</span><span>${money(total, shop.currency)}</span></div>
      <div class="sep"></div>
      ${rows}
      <div class="sep"></div>
-     <div class="row"><span>Attendu en caisse</span><span>${money(expected, shop.currency)}</span></div>
-     <div class="row"><span>Compté</span><span>${money(counted, shop.currency)}</span></div>
-     <div class="row total"><span>Écart</span><span>${money(diff, shop.currency)}</span></div>
+     <div class="row"><span>${tp('tk_expected')}</span><span>${money(expected, shop.currency)}</span></div>
+     <div class="row"><span>${tp('tk_counted')}</span><span>${money(counted, shop.currency)}</span></div>
+     <div class="row total"><span>${tp('tk_diff')}</span><span>${money(diff, shop.currency)}</span></div>
      <div class="sep"></div>
      <div class="center muted">${shop.footer}</div>`,
   )

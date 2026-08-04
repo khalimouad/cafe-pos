@@ -78,17 +78,18 @@ export function useDB() {
   return { db, update }
 }
 
+// Les montants restent lus de gauche à droite, même quand l'interface est en RTL.
 export const money = (n: number, currency = 'DH') =>
-  `${n.toFixed(2).replace(/\.00$/, ',00').replace('.', ',')} ${currency}`
+  `\u2066${n.toFixed(2).replace('.', ',')} ${currency}\u2069`
 
 export const dateFR = (iso: string) =>
-  new Date(iso).toLocaleString('fr-FR', {
+  '\u2066' + new Date(iso).toLocaleString('fr-FR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  })
+  }) + '\u2069'
 
 export const timeFR = (iso: string) =>
-  new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  '\u2066' + new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '\u2069'

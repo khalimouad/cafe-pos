@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Cashier, Order, Session, Shop } from '../lib/types'
 import { dateFR, money, timeFR } from '../lib/store'
 import { printTicket } from '../lib/print'
+import { useI18n } from '../lib/i18n'
 
 type Props = {
   orders: Order[]
@@ -14,6 +15,7 @@ type Props = {
 type Range = 'session' | 'jour' | 'tout'
 
 export default function History({ orders, sessions, cashiers, shop, currentSessionId }: Props) {
+  const { t } = useI18n()
   const [range, setRange] = useState<Range>(currentSessionId ? 'session' : 'jour')
   const [cashierId, setCashierId] = useState('tous')
   const [openId, setOpenId] = useState<string | null>(null)
@@ -48,11 +50,11 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
 
   return (
     <div className="page">
-      <h1>Historique des commandes</h1>
-      <p className="sub">Toutes les commandes sont réglées en espèces au moment de la validation.</p>
+      <h1>{t('hist_title')}</h1>
+      <p className="sub">{t('hist_sub')}</p>
 
       <div className="filters">
-        {([['session', 'Session en cours'], ['jour', "Aujourd'hui"], ['tout', 'Tout']] as [Range, string][]).map(
+        {([['session', t('filter_session')], ['jour', t('filter_today')], ['tout', t('filter_all')]] as [Range, string][]).map(
           ([k, label]) => (
             <button
               key={k}
@@ -65,7 +67,7 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
           ),
         )}
         <select className="input" style={{ width: 'auto' }} value={cashierId} onChange={(e) => setCashierId(e.target.value)}>
-          <option value="tous">Tous les caissiers</option>
+          <option value="tous">{t('filter_cashiers')}</option>
           {cashiers.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -74,30 +76,30 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
 
       <div className="stats">
         <div className="stat">
-          <div className="k">Commandes</div>
+          <div className="k">{t('stat_orders')}</div>
           <div className="v">{filtered.length}</div>
         </div>
         <div className="stat">
-          <div className="k">Total encaissé</div>
+          <div className="k">{t('stat_total')}</div>
           <div className="v green">{money(total, shop.currency)}</div>
         </div>
         <div className="stat">
-          <div className="k">Ticket moyen</div>
+          <div className="k">{t('stat_avg')}</div>
           <div className="v">{money(avg, shop.currency)}</div>
         </div>
         {perCashier.slice(0, 1).map((c) => (
           <div className="stat" key={c.name}>
-            <div className="k">Meilleur caissier</div>
+            <div className="k">{t('stat_best')}</div>
             <div className="v" style={{ fontSize: 20 }}>{c.name}</div>
           </div>
         ))}
       </div>
 
       {perCashier.length > 1 && (
-        <div className="list" style={{ marginBottom: 24 }}>
+        <div className="list scroll-x" style={{ marginBottom: 24 }}>
           <table className="simple">
             <thead>
-              <tr><th>Caissier</th><th>Commandes</th><th>Total</th></tr>
+              <tr><th>{t('th_cashier')}</th><th>{t('th_orders')}</th><th>{t('th_total')}</th></tr>
             </thead>
             <tbody>
               {perCashier.map((c) => (
@@ -114,7 +116,7 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
 
       {filtered.length === 0 ? (
         <div className="list">
-          <div className="item" style={{ color: 'var(--muted)' }}>Aucune commande pour ce filtre.</div>
+          <div className="item" style={{ color: 'var(--muted)' }}>{t('hist_empty')}</div>
         </div>
       ) : (
         <div className="list">
@@ -122,34 +124,35 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
             const s = sessionOf(o.sessionId)
             return (
               <div key={o.id}>
-                <div className="item" onClick={() => setOpenId(openId === o.id ? null : o.id)} style={{ cursor: 'pointer' }}>
+                <div className="item" onClick={() => setOpenId(openId === o.id ? null : o.id)}>
                   <div className="num">#{String(o.number).padStart(4, '0')}</div>
                   <div className="who">
-                    <div className="n">{o.cashierName} — {o.lines.reduce((s2, l) => s2 + l.qty, 0)} article(s)</div>
+                    <div className="n">
+                      {o.cashierName} — {t('hist_items', { n: o.lines.reduce((s2, l) => s2 + l.qty, 0) })}
+                    </div>
                     <div className="d">
                       {dateFR(o.createdAt)}
-                      {s ? ` · caisse du ${new Date(s.openedAt).toLocaleDateString('fr-FR')}` : ''}
+                      {s ? ` · ${t('hist_register_of', { date: new Date(s.openedAt).toLocaleDateString('fr-FR') })}` : ''}
                     </div>
                   </div>
                   <div className="tot">{money(o.total, shop.currency)}</div>
                   <button
-                    className="btn ghost"
-                    style={{ padding: '8px 12px', fontSize: 13 }}
+                    className="btn ghost small"
                     onClick={(e) => { e.stopPropagation(); printTicket(o, shop) }}
                   >
-                    Réimprimer
+                    {t('hist_reprint')}
                   </button>
                 </div>
                 {openId === o.id && (
-                  <div className="detail" style={{ margin: '0 18px 14px' }}>
+                  <div className="detail">
                     {o.lines.map((l) => (
                       <div className="dl" key={l.productId}>
                         <span>{l.qty} × {l.name}</span>
                         <span>{money(l.price * l.qty, shop.currency)}</span>
                       </div>
                     ))}
-                    <div className="dl" style={{ color: 'var(--text)', fontWeight: 700, marginTop: 6 }}>
-                      <span>Total espèces — {timeFR(o.createdAt)}</span>
+                    <div className="dl strong">
+                      <span>{t('hist_total_at', { time: timeFR(o.createdAt) })}</span>
                       <span>{money(o.total, shop.currency)}</span>
                     </div>
                   </div>

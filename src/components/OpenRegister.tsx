@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { money } from '../lib/store'
+import { useI18n } from '../lib/i18n'
 
 type Props = {
   cashierName: string
@@ -10,21 +11,21 @@ type Props = {
 const PRESETS = [0, 100, 200, 500]
 
 export default function OpenRegister({ cashierName, currency, onOpen }: Props) {
+  const { t } = useI18n()
   const [value, setValue] = useState('200')
   const amount = Number(value.replace(',', '.')) || 0
 
   return (
     <div className="screen">
       <div className="panel">
-        <h1>Ouverture de caisse</h1>
-        <p className="sub">
-          La caisse est fermée. {cashierName}, indiquez le fond de caisse en espèces pour démarrer la journée.
-        </p>
+        <h1>{t('open_title')}</h1>
+        <p className="sub">{t('open_sub', { name: cashierName })}</p>
 
         <div className="field">
-          <label>Fond de caisse ({currency})</label>
+          <label>{t('open_float', { currency })}</label>
           <input
             className="input big"
+            dir="ltr"
             inputMode="decimal"
             value={value}
             onChange={(e) => setValue(e.target.value.replace(/[^0-9.,]/g, ''))}
@@ -41,7 +42,7 @@ export default function OpenRegister({ cashierName, currency, onOpen }: Props) {
         </div>
 
         <button className="btn primary block pay" onClick={() => onOpen(amount)}>
-          Ouvrir la caisse
+          {t('open_btn')}
         </button>
       </div>
     </div>
