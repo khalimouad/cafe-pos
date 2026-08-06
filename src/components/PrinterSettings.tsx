@@ -15,6 +15,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
   const { t } = useI18n()
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
   const [devices, setDevices] = useState<string[]>([])
+  const [winPrinters, setWinPrinters] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
   const cfg = printerConfig(shop)
@@ -26,6 +27,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
     try {
       const r = await pingPrinter(cfg)
       setDevices(r.usbDevices ?? [])
+      setWinPrinters(r.windowsPrinters ?? [])
       setStatus(
         r.printer
           ? { ok: true, text: t('printer_ok', { target: r.target ?? '' }) }
@@ -125,9 +127,14 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
             <div className="field" style={{ margin: 0 }}>
               <label>{t(`printer_target_${shop.printerTransport}`)}</label>
               {text('printerTarget')}
-              {devices.length > 0 && (
+              {shop.printerTransport === 'usb' && devices.length > 0 && (
                 <p className="sub" style={{ margin: '6px 0 0' }}>
                   {t('printer_devices', { list: devices.join(', ') })}
+                </p>
+              )}
+              {shop.printerTransport === 'windows' && winPrinters.length > 0 && (
+                <p className="sub" style={{ margin: '6px 0 0' }}>
+                  {t('printer_windows_list', { list: winPrinters.join(', ') })}
                 </p>
               )}
             </div>

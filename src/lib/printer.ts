@@ -63,6 +63,7 @@ export type PrinterHealth = {
   transport?: string
   target?: string
   usbDevices?: string[]
+  windowsPrinters?: string[]
   platform?: string
 }
 

@@ -68,7 +68,7 @@ navigateur ne pouvant pas plus écrire sur un port USB qu'ouvrir une socket TCP.
 | Linux | **USB** | `/dev/usb/lp0` (l'agent liste les ports détectés) |
 | macOS | **File d'impression CUPS** | nom de la file, ex. `POS80` |
 | Linux (via CUPS) | **File d'impression CUPS** | nom de la file, ex. `POS80` |
-| Windows | **Imprimante partagée Windows** | `\\localhost\POS80` |
+| Windows | **Windows (imprimante installée)** | nom Windows, ex. `printer WD8260` |
 
 **Linux** — le port apparaît en `/dev/usb/lp0`. Si l'agent répond « droits
 insuffisants », ajouter l'utilisateur au groupe propriétaire du port :
@@ -78,10 +78,21 @@ ls -l /dev/usb/lp0            # ex. root lp
 sudo usermod -aG lp $USER     # puis se reconnecter
 ```
 
-**Windows** — installer le pilote de l'imprimante, la partager sous un nom court
-(clic droit → Propriétés → Partage, ex. `POS80`), puis choisir *Imprimante partagée
-Windows* avec la cible `\\localhost\POS80`. L'agent envoie les octets bruts par
-`copy /b`, sans passer par le rendu du pilote.
+**Windows** — le pilote de l'imprimante étant installé, il suffit de reprendre le **nom
+exact affiché dans Windows** (par exemple `printer WD8260`) et de choisir *Windows
+(imprimante installée)*. Aucun partage à configurer : l'agent envoie les octets au
+spouleur en mode **RAW**, donc le pilote ne redessine rien et l'imprimante reçoit
+l'ESC/POS tel quel. Le bouton *Tester la connexion* liste les imprimantes installées et
+vérifie que le nom existe.
+
+Le champ accepte aussi un chemin de partage (`\\poste\POS80`) si l'imprimante est
+partagée depuis un autre PC : dans ce cas l'agent utilise `copy /b`.
+
+Pour retrouver le nom exact :
+
+```powershell
+(Get-Printer).Name
+```
 
 **macOS / Linux avec CUPS** — créer une file en mode brut :
 

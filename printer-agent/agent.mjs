@@ -9,7 +9,8 @@
  *   tcp     — imprimante réseau, port brut 9100          ?transport=tcp&ip=192.168.123.100&port=9100
  *   usb     — port USB vu comme un fichier (Linux/macOS) ?transport=usb&target=/dev/usb/lp0
  *   cups    — file d'impression CUPS en mode brut        ?transport=cups&target=POS80
- *   windows — imprimante partagée sous Windows           ?transport=windows&target=\\localhost\POS80
+ *   windows — imprimante installée sous Windows          ?transport=windows&target=printer WD8260
+ *             (ou un partage \\poste\POS80)
  *
  *   node agent.mjs                     # écoute sur 0.0.0.0:7777
  *   PORT=7777 PRINTER_IP=192.168.123.100 node agent.mjs
@@ -104,9 +105,9 @@ function listDevices() {
 
 /* ------------------------------------------------- CUPS / partage Windows */
 
-function run(cmd, args, payload) {
+function run(cmd, args, payload, env) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { windowsHide: true })
+    const child = spawn(cmd, args, { windowsHide: true, env: env ?? process.env })
     let err = ''
     child.stderr.on('data', (d) => (err += d))
     child.on('error', (e) => reject(new Error(`${cmd} — ${e.message}`)))
@@ -119,15 +120,100 @@ function run(cmd, args, payload) {
 
 const sendCups = (queue, payload) => run('lp', ['-d', queue, '-o', 'raw'], payload)
 
-/** Windows : passe par un fichier temporaire et une copie brute vers le partage. */
-async function sendWindows(share, payload) {
+/**
+ * Envoie les octets au spouleur Windows en mode RAW, en nommant l'imprimante telle
+ * qu'elle apparaît dans Windows (ex. « printer WD8260 »). RAW veut dire que le pilote
+ * ne redessine rien : l'imprimante reçoit l'ESC/POS tel quel.
+ */
+const RAW_PRINT_PS = `
+$ErrorActionPreference = 'Stop'
+$name = $env:CAFE_PRINTER
+$file = $env:CAFE_PAYLOAD
+Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class CafeRawPrinter {
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  public class DOCINFO { [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType; }
+  [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+  static extern bool OpenPrinter(string src, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.drv", SetLastError = true)] static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+  static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFO di);
+  [DllImport("winspool.drv", SetLastError = true)] static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.drv", SetLastError = true)] static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.drv", SetLastError = true)] static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.drv", SetLastError = true)]
+  static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+
+  public static void Send(string printer, string file) {
+    byte[] bytes = File.ReadAllBytes(file);
+    IntPtr h;
+    if (!OpenPrinter(printer, out h, IntPtr.Zero))
+      throw new Exception("Imprimante introuvable : " + printer);
+    try {
+      DOCINFO di = new DOCINFO();
+      di.pDocName = "Ticket POS Cafe";
+      di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("StartDocPrinter a echoue");
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("StartPagePrinter a echoue");
+        IntPtr buf = Marshal.AllocCoTaskMem(bytes.Length);
+        try {
+          Marshal.Copy(bytes, 0, buf, bytes.Length);
+          int written;
+          if (!WritePrinter(h, buf, bytes.Length, out written) || written != bytes.Length)
+            throw new Exception("Ecriture incomplete vers le spouleur");
+        } finally { Marshal.FreeCoTaskMem(buf); }
+        EndPagePrinter(h);
+      } finally { EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+"@
+[CafeRawPrinter]::Send($name, $file)
+`
+
+/**
+ * Windows : nom d'imprimante installée (« printer WD8260 ») via le spouleur en RAW,
+ * ou chemin de partage (« \\\\poste\\POS80 ») par copie brute.
+ */
+async function sendWindows(name, payload) {
   const tmp = path.join(os.tmpdir(), `cafe-ticket-${Date.now()}.bin`)
   await fs.promises.writeFile(tmp, payload)
   try {
-    await run('cmd', ['/c', 'copy', '/b', tmp, share])
+    if (name.startsWith('\\\\')) {
+      await run('cmd', ['/c', 'copy', '/b', tmp, name])
+    } else {
+      await run(
+        'powershell',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', RAW_PRINT_PS],
+        null,
+        { ...process.env, CAFE_PRINTER: name, CAFE_PAYLOAD: tmp },
+      )
+    }
   } finally {
     fs.promises.unlink(tmp).catch(() => {})
   }
+}
+
+/** Noms exacts des imprimantes installées, pour éviter de les recopier à la main. */
+function listWindowsPrinters() {
+  if (process.platform !== 'win32') return Promise.resolve([])
+  return new Promise((resolve) => {
+    const child = spawn(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command', '(Get-Printer).Name'],
+      { windowsHide: true },
+    )
+    let out = ''
+    child.stdout.on('data', (d) => (out += d))
+    child.on('error', () => resolve([]))
+    child.on('close', () => resolve(out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)))
+  })
 }
 
 /* ------------------------------------------------------------ aiguillage */
@@ -154,8 +240,18 @@ async function probe(t) {
   switch (t.transport) {
     case 'usb': return probeDevice(t.value)
     // Une file CUPS ou un partage Windows ne se teste qu'à l'impression.
-    case 'cups':
-    case 'windows': return t.value ? { ok: true, detail: 'vérifié à l’impression' } : { ok: false, detail: 'nom manquant' }
+    case 'windows': {
+      if (!t.value) return { ok: false, detail: 'nom manquant' }
+      if (t.value.startsWith('\\\\') || process.platform !== 'win32') {
+        return { ok: true, detail: 'vérifié à l’impression' }
+      }
+      const printers = await listWindowsPrinters()
+      return printers.includes(t.value)
+        ? { ok: true }
+        : { ok: false, detail: `imprimante « ${t.value} » absente de Windows` }
+    }
+    // Une file CUPS ne se teste qu'à l'impression.
+    case 'cups': return t.value ? { ok: true, detail: 'vérifié à l’impression' } : { ok: false, detail: 'nom manquant' }
     case 'tcp': return probeTcp(t.ip, t.port)
     default: return { ok: false, detail: `branchement inconnu : ${t.transport}` }
   }
@@ -197,6 +293,7 @@ http
         transport: t.transport,
         target: describe(t),
         usbDevices: listDevices(),
+        windowsPrinters: await listWindowsPrinters(),
         platform: process.platform,
       })
     }
@@ -231,5 +328,6 @@ http
     log(`agent d'impression prêt sur http://${HOST}:${PORT}`)
     log(`réseau par défaut : ${DEFAULT_IP}:${DEFAULT_PORT}`)
     const usb = listDevices()
-    if (usb.length) log(`imprimantes USB détectées : ${usb.join(', ')}`)
+    if (usb.length) log(`ports USB détectés : ${usb.join(', ')}`)
+    listWindowsPrinters().then((p) => p.length && log(`imprimantes Windows : ${p.join(', ')}`))
   })
