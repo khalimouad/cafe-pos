@@ -99,8 +99,10 @@ un ticket qui n'existe pas en base.
 ## Réglages (responsable)
 
 - Nom, adresse, téléphone, devise et message de bas de ticket
-- Carte : ajout de produits, modification des prix, masquage d'un produit
-- Caissiers : ajout, changement de code, suppression
+- Carte : ajout de produits, modification des prix, masquage ou suppression d'un
+  produit (les commandes déjà passées gardent leur libellé et leur prix)
+- Caissiers : ajout, changement de code, suppression — impossible de supprimer le
+  dernier caissier ni le dernier responsable
 
 ## Impression
 

@@ -3,6 +3,7 @@ import type { PrinterTransport, Shop } from '../lib/types'
 import { testBytes } from '../lib/escpos'
 import { pingPrinter, printerConfig, sendToPrinter } from '../lib/printer'
 import { useI18n } from '../lib/i18n'
+import { errorText } from '../lib/store'
 
 type Props = {
   shop: Shop
@@ -34,7 +35,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
           : { ok: false, text: t('printer_unreachable', { detail: r.detail ?? '' }) },
       )
     } catch (e) {
-      setStatus({ ok: false, text: t('printer_no_agent', { detail: e instanceof Error ? e.message : String(e) }) })
+      setStatus({ ok: false, text: t('printer_no_agent', { detail: errorText(e) }) })
     } finally {
       setBusy(false)
     }
@@ -47,7 +48,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
       await sendToPrinter(testBytes(shop, { cut: shop.printerCut, beep: shop.printerBeep }), cfg)
       setStatus({ ok: true, text: t('printer_test_sent') })
     } catch (e) {
-      setStatus({ ok: false, text: e instanceof Error ? e.message : String(e) })
+      setStatus({ ok: false, text: errorText(e) })
     } finally {
       setBusy(false)
     }

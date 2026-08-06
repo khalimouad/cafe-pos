@@ -6,7 +6,7 @@ import History from './components/History'
 import CloseRegister from './components/CloseRegister'
 import Settings from './components/Settings'
 import LangSwitch from './components/LangSwitch'
-import { money, timeFR, useDB } from './lib/store'
+import { errorText, money, timeFR, useDB } from './lib/store'
 import { printTicket, printZReport } from './lib/print'
 import { useI18n, type T } from './lib/i18n'
 import type { Cashier, OrderLine } from './lib/types'
@@ -59,7 +59,7 @@ export default function App() {
     setCashier(c)
   }
 
-  const fail = (e: unknown) => setToast(`⚠️ ${e instanceof Error ? e.message : String(e)}`)
+  const fail = (e: unknown) => setToast(`⚠️ ${errorText(e)}`)
 
   if (!ready) {
     return (

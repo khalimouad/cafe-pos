@@ -93,17 +93,8 @@ begin
   end loop;
 end $$;
 
-drop policy if exists cafe_cashiers_anon_write on public.cafe_cashiers;
-create policy cafe_cashiers_anon_write on public.cafe_cashiers
-  for insert to anon with check (true);
-
-drop policy if exists cafe_cashiers_anon_update on public.cafe_cashiers;
-create policy cafe_cashiers_anon_update on public.cafe_cashiers
-  for update to anon using (true) with check (true);
-
-drop policy if exists cafe_cashiers_anon_delete on public.cafe_cashiers;
-create policy cafe_cashiers_anon_delete on public.cafe_cashiers
-  for delete to anon using (true);
+-- Aucune policy d'écriture directe sur cafe_cashiers : tout passe par les fonctions
+-- cafe_add_cashier / cafe_set_cashier_pin / cafe_delete_cashier définies plus bas.
 
 -- Liste des caissiers sans le PIN.
 create or replace view public.cafe_cashiers_public
@@ -162,6 +153,92 @@ $$;
 
 revoke all on function public.cafe_verify_pin(uuid, text) from public;
 grant execute on function public.cafe_verify_pin(uuid, text) to anon, authenticated;
+
+-- Les caissiers ne sont lisibles par personne côté client (les codes doivent rester
+-- en base). Or PostgreSQL exige de « voir » une ligne pour la modifier ou la supprimer :
+-- un update/delete direct ne toucherait aucune ligne, en silence. D'où ces fonctions,
+-- qui portent aussi les garde-fous.
+
+create or replace function public.cafe_add_cashier(p_name text, p_pin text, p_admin boolean default false)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_id uuid;
+begin
+  if coalesce(trim(p_name), '') = '' then
+    raise exception 'Le nom du caissier est obligatoire.';
+  end if;
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'Le code doit comporter 4 chiffres.';
+  end if;
+  insert into public.cafe_cashiers (name, pin, admin)
+  values (trim(p_name), p_pin, coalesce(p_admin, false))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.cafe_set_cashier_pin(p_cashier_id uuid, p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_n int;
+begin
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'Le code doit comporter 4 chiffres.';
+  end if;
+  update public.cafe_cashiers set pin = p_pin where id = p_cashier_id;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then
+    raise exception 'Ce caissier n''existe plus.';
+  end if;
+  -- Un nouveau code lève un éventuel blocage en cours.
+  delete from public.cafe_pin_attempts where cashier_id = p_cashier_id;
+  return true;
+end;
+$$;
+
+create or replace function public.cafe_delete_cashier(p_cashier_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_admin boolean; v_total int; v_admins int;
+begin
+  select admin into v_admin from public.cafe_cashiers where id = p_cashier_id;
+  if v_admin is null then
+    raise exception 'Ce caissier n''existe plus.';
+  end if;
+
+  select count(*) into v_total from public.cafe_cashiers;
+  if v_total <= 1 then
+    raise exception 'Impossible de supprimer le dernier caissier.';
+  end if;
+
+  if v_admin then
+    select count(*) into v_admins from public.cafe_cashiers where admin;
+    if v_admins <= 1 then
+      raise exception 'Impossible de supprimer le dernier responsable.';
+    end if;
+  end if;
+
+  -- Les commandes gardent le nom du caissier : l'historique reste lisible.
+  delete from public.cafe_cashiers where id = p_cashier_id;
+  return true;
+end;
+$$;
+
+revoke all on function public.cafe_add_cashier(text, text, boolean) from public;
+revoke all on function public.cafe_set_cashier_pin(uuid, text) from public;
+revoke all on function public.cafe_delete_cashier(uuid) from public;
+grant execute on function public.cafe_add_cashier(text, text, boolean) to anon, authenticated;
+grant execute on function public.cafe_set_cashier_pin(uuid, text) to anon, authenticated;
+grant execute on function public.cafe_delete_cashier(uuid) to anon, authenticated;
 
 -- Temps réel : le poste et le téléphone voient les mêmes données sans rechargement.
 do $$

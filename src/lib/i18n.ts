@@ -143,6 +143,8 @@ const fr: Dict = {
   set_code: 'Code',
   set_role: 'Rôle',
   set_confirm_delete: 'Supprimer le caissier {name} ?',
+  set_confirm_delete_product: 'Supprimer {name} de la carte ? Les commandes déjà passées ne changent pas.',
+  set_delete_hint: 'Masquer un produit le retire de la caisse sans toucher à la carte ; le supprimer l’efface définitivement.',
   set_revenue: 'Chiffre d’affaires total enregistré : {amount} sur {n} commandes.',
 
   // Ticket
@@ -294,6 +296,8 @@ const ma: Dict = {
   set_code: 'الكود',
   set_role: 'الدور',
   set_confirm_delete: 'بغيتي تمسح الكاسي {name} ؟',
+  set_confirm_delete_product: 'بغيتي تمسح {name} من لاكارط ؟ الكوموندات اللي دازو ماغاديش يتبدلو.',
+  set_delete_hint: 'إلا خبّيتي شي حاجة غادي تختافى من لاكيس بلا ما تتمسح ؛ المسح كيمسحها للأبد.',
   set_revenue: 'المجموع اللي دخل من اللول : {amount} ف {n} كوموند.',
 
   tk_phone: 'التيليفون',

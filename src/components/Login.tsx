@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Cashier } from '../lib/types'
 import { useI18n } from '../lib/i18n'
+import { errorText } from '../lib/store'
 import LangSwitch from './LangSwitch'
 
 type Props = {
@@ -32,7 +33,7 @@ export default function Login({ cashiers, shopName, verifyPin, onLogin }: Props)
       }
       setError(t('login_wrong'))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errorText(e))
     } finally {
       setChecking(false)
       setTimeout(() => setPin(''), 300)

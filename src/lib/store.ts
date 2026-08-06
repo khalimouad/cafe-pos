@@ -102,9 +102,13 @@ export function useDB() {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pending = useRef(false)
+  const queued = useRef(false)
 
   const reload = useCallback(async () => {
-    if (pending.current) return
+    if (pending.current) {
+      queued.current = true
+      return
+    }
     pending.current = true
     try {
       setDb(await fetchAll())
@@ -114,6 +118,10 @@ export function useDB() {
     } finally {
       pending.current = false
       setReady(true)
+      if (queued.current) {
+        queued.current = false
+        void reload()
+      }
     }
   }, [])
 
@@ -219,29 +227,50 @@ function useActions(reload: () => Promise<void>) {
       await reload()
     },
 
+    removeProduct: async (id: string) => {
+      const { error } = await supabase.from('cafe_products').delete().eq('id', id)
+      if (error) throw error
+      await reload()
+    },
+
     updateProduct: async (id: string, patch: Partial<Product>) => {
       const { error } = await supabase.from('cafe_products').update(patch).eq('id', id)
       if (error) throw error
       await reload()
     },
 
+    // La table des caissiers n'est lisible par personne côté client : sans cela,
+    // PostgreSQL ne peut ni modifier ni supprimer une ligne qu'il ne « voit » pas.
     addCashier: async (name: string, pin: string) => {
-      const { error } = await supabase.from('cafe_cashiers').insert({ name, pin })
+      const { error } = await supabase.rpc('cafe_add_cashier', { p_name: name, p_pin: pin })
       if (error) throw error
       await reload()
     },
 
     setCashierPin: async (id: string, pin: string) => {
-      const { error } = await supabase.from('cafe_cashiers').update({ pin }).eq('id', id)
+      const { error } = await supabase.rpc('cafe_set_cashier_pin', { p_cashier_id: id, p_pin: pin })
       if (error) throw error
+      await reload()
     },
 
     removeCashier: async (id: string) => {
-      const { error } = await supabase.from('cafe_cashiers').delete().eq('id', id)
+      const { error } = await supabase.rpc('cafe_delete_cashier', { p_cashier_id: id })
       if (error) throw error
       await reload()
     },
   }
+}
+
+/** Les erreurs Supabase ne sont pas des Error : sans cela on affiche « [object Object] ». */
+export function errorText(e: unknown): string {
+  if (e instanceof Error) return e.message
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; hint?: unknown; details?: unknown; code?: unknown }
+    const parts = [o.message, o.details, o.hint].filter((v) => typeof v === 'string' && v)
+    if (parts.length) return parts.join(' — ')
+    if (o.code) return `Erreur ${String(o.code)}`
+  }
+  return String(e)
 }
 
 export type Actions = ReturnType<typeof useActions>

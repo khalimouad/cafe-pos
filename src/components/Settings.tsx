@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { DB, Cashier, Product } from '../lib/types'
-import { money, type Actions } from '../lib/store'
+import { errorText, money, type Actions } from '../lib/store'
 import { useI18n } from '../lib/i18n'
 import PrinterSettings from './PrinterSettings'
 
@@ -21,7 +21,7 @@ export default function Settings({ db, store }: Props) {
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errorText(e))
     }
   }
 
@@ -39,6 +39,12 @@ export default function Settings({ db, store }: Props) {
     })
 
   const patchProduct = (id: string, patch: Partial<Product>) => run(() => store.updateProduct(id, patch))
+
+  const removeProduct = (p: Product) =>
+    run(async () => {
+      if (!confirm(t('set_confirm_delete_product', { name: p.name }))) return
+      await store.removeProduct(p.id)
+    })
 
   const addCashier = () =>
     run(async () => {
@@ -93,10 +99,11 @@ export default function Settings({ db, store }: Props) {
       </div>
 
       <h2 className="section">{t('set_menu', { n: db.products.length })}</h2>
+      <p className="sub">{t('set_delete_hint')}</p>
       <div className="list scroll-x" style={{ marginBottom: 16 }}>
         <table className="simple">
           <thead>
-            <tr><th></th><th>{t('set_product')}</th><th>{t('set_category')}</th><th>{t('set_price')}</th><th>{t('set_visible')}</th></tr>
+            <tr><th></th><th>{t('set_product')}</th><th>{t('set_category')}</th><th>{t('set_price')}</th><th>{t('set_visible')}</th><th></th></tr>
           </thead>
           <tbody>
             {db.products.map((p) => (
@@ -120,6 +127,9 @@ export default function Settings({ db, store }: Props) {
                   <button className="btn ghost small" onClick={() => void patchProduct(p.id, { active: !p.active })}>
                     {p.active ? t('yes') : t('no')}
                   </button>
+                </td>
+                <td>
+                  <button className="btn danger small" onClick={() => void removeProduct(p)}>{t('delete')}</button>
                 </td>
               </tr>
             ))}
