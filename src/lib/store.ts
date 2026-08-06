@@ -3,7 +3,19 @@ import { supabase } from './supabase'
 import type { Cashier, DB, Order, OrderLine, Product, Session, Shop } from './types'
 
 const EMPTY: DB = {
-  shop: { name: 'Café', address: '', phone: '', currency: 'DH', footer: '' },
+  shop: {
+    name: 'Café',
+    address: '',
+    phone: '',
+    currency: 'DH',
+    footer: '',
+    printerEnabled: false,
+    printerAgentUrl: 'http://127.0.0.1:7777',
+    printerIp: '192.168.123.100',
+    printerPort: 9100,
+    printerCut: true,
+    printerBeep: false,
+  },
   cashiers: [],
   products: [],
   sessions: [],
@@ -18,6 +30,12 @@ const toShop = (r: Row): Shop => ({
   phone: String(r.phone ?? ''),
   currency: String(r.currency ?? 'DH'),
   footer: String(r.footer ?? ''),
+  printerEnabled: Boolean(r.printer_enabled),
+  printerAgentUrl: String(r.printer_agent_url ?? 'http://127.0.0.1:7777'),
+  printerIp: String(r.printer_ip ?? '192.168.123.100'),
+  printerPort: Number(r.printer_port ?? 9100),
+  printerCut: r.printer_cut === undefined ? true : Boolean(r.printer_cut),
+  printerBeep: Boolean(r.printer_beep),
 })
 
 const toProduct = (r: Row): Product => ({
@@ -167,8 +185,24 @@ function useActions(reload: () => Promise<void>) {
     },
 
     updateShop: async (patch: Partial<Shop>) => {
-      const { error } = await supabase.from('cafe_shop').update(patch).eq('id', true)
+      // Les champs de l'application sont en camelCase, les colonnes en snake_case.
+      const columns: Record<keyof Shop, string> = {
+        name: 'name',
+        address: 'address',
+        phone: 'phone',
+        currency: 'currency',
+        footer: 'footer',
+        printerEnabled: 'printer_enabled',
+        printerAgentUrl: 'printer_agent_url',
+        printerIp: 'printer_ip',
+        printerPort: 'printer_port',
+        printerCut: 'printer_cut',
+        printerBeep: 'printer_beep',
+      }
+      const row = Object.fromEntries(Object.entries(patch).map(([k, v]) => [columns[k as keyof Shop], v]))
+      const { error } = await supabase.from('cafe_shop').update(row).eq('id', true)
       if (error) throw error
+      await reload()
     },
 
     addProduct: async (p: Omit<Product, 'id' | 'active'>) => {

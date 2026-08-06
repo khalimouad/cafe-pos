@@ -60,6 +60,15 @@ create table if not exists public.cafe_orders (
 create index if not exists cafe_orders_session_idx on public.cafe_orders (session_id);
 create index if not exists cafe_orders_created_idx on public.cafe_orders (created_at desc);
 
+-- Imprimante ticket ESC/POS (réseau, port brut 9100), pilotée par l'agent local.
+alter table public.cafe_shop
+  add column if not exists printer_enabled boolean not null default false,
+  add column if not exists printer_agent_url text not null default 'http://127.0.0.1:7777',
+  add column if not exists printer_ip text not null default '192.168.123.100',
+  add column if not exists printer_port int not null default 9100,
+  add column if not exists printer_cut boolean not null default true,
+  add column if not exists printer_beep boolean not null default false;
+
 alter table public.cafe_shop enable row level security;
 alter table public.cafe_cashiers enable row level security;
 alter table public.cafe_products enable row level security;

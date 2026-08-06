@@ -139,7 +139,7 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
                   <div className="tot">{money(o.total, shop.currency)}</div>
                   <button
                     className="btn ghost small"
-                    onClick={(e) => { e.stopPropagation(); printTicket(o, shop) }}
+                    onClick={(e) => { e.stopPropagation(); void printTicket(o, shop) }}
                   >
                     {t('hist_reprint')}
                   </button>

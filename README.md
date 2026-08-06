@@ -88,6 +88,19 @@ un ticket qui n'existe pas en base.
 
 ## Impression
 
-L'impression utilise la boîte de dialogue du navigateur avec une mise en page 80 mm.
-Pour une imprimante ticket : la définir comme imprimante par défaut et activer
-l'impression sans boîte de dialogue (Chrome : lancer avec `--kiosk-printing`).
+Le ticket part **directement** sur l'imprimante thermique 80 mm, sans boîte de dialogue.
+
+L'imprimante est en réseau (IP fixe `192.168.123.100`, port brut `9100`). Un navigateur
+ne pouvant pas ouvrir de socket TCP, un petit agent Node tourne sur le poste du café et
+fait le pont : voir **[`printer-agent/`](printer-agent/)** pour l'installation et le
+démarrage automatique.
+
+Le ticket est dessiné par le navigateur puis envoyé en image raster ESC/POS (`GS v 0`),
+suivi de la coupe (`GS V 66`) et du bip optionnel. C'est le navigateur qui compose
+l'image, donc la darija sort avec les bonnes liaisons de lettres et le bon sens
+d'écriture, sans dépendre des jeux de caractères de l'imprimante.
+
+Réglages → **Imprimante ticket** : activation, adresse de l'agent, IP et port de
+l'imprimante, coupe, bip, test de connexion et ticket de test. Si l'agent ou
+l'imprimante ne répond pas, le POS bascule automatiquement sur le dialogue d'impression
+du navigateur et le signale — la commande, elle, est déjà enregistrée.

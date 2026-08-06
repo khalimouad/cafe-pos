@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DB, Cashier, Product } from '../lib/types'
 import { money, type Actions } from '../lib/store'
 import { useI18n } from '../lib/i18n'
+import PrinterSettings from './PrinterSettings'
 
 type Props = {
   db: DB
@@ -148,6 +149,8 @@ export default function Settings({ db, store }: Props) {
         </div>
         <button className="btn primary" onClick={() => void addProduct()}>{t('add')}</button>
       </div>
+
+      <PrinterSettings shop={db.shop} updateShop={(patch) => run(() => store.updateShop(patch))} />
 
       <h2 className="section">{t('set_cashiers')}</h2>
       <p className="sub">{t('set_pin_hidden')}</p>

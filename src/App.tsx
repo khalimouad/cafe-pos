@@ -134,8 +134,12 @@ export default function App() {
     const total = lines.reduce((s, l) => s + l.price * l.qty, 0)
     try {
       const order = await store.createOrder({ sessionId: openSession.id, cashier, lines, total })
-      printTicket(order, db.shop)
-      setToast(t('toast_paid', { amount: money(total, db.shop.currency), n: order.number }))
+      const printed = await printTicket(order, db.shop)
+      setToast(
+        printed.error
+          ? t('toast_printer_fallback', { detail: printed.error })
+          : t('toast_paid', { amount: money(total, db.shop.currency), n: order.number }),
+      )
     } catch (e) {
       fail(e)
       throw e
@@ -156,7 +160,7 @@ export default function App() {
         map.set(key, e)
       })
 
-      printZReport(
+      await printZReport(
         { ...openSession, closedAt: new Date().toISOString(), closedBy: cashier.name, countedCash },
         sessionOrders,
         db.shop,

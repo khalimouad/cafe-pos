@@ -1,6 +1,8 @@
 import type { Order, Session, Shop } from './types'
 import { dateFR, money } from './store'
 import { getLang, translate } from './i18n'
+import { ticketBytes, zReportBytes } from './escpos'
+import { printerConfig, sendToPrinter } from './printer'
 
 const CSS = `
   @page { size: 80mm auto; margin: 4mm; }
@@ -51,7 +53,50 @@ const head = (shop: Shop) => `
   <div class="center muted">${tp('tk_phone')} : <bdi>${shop.phone}</bdi></div>
   <div class="sep"></div>`
 
-export function printTicket(order: Order, shop: Shop) {
+export type PrintResult = { direct: boolean; error?: string }
+
+/**
+ * Impression directe sur l'imprimante ticket via l'agent local. En cas d'échec
+ * (agent éteint, imprimante débranchée), on retombe sur le dialogue du navigateur
+ * pour que le client reparte quand même avec son ticket.
+ */
+async function direct(makeBytes: () => Uint8Array, shop: Shop, fallback: () => void): Promise<PrintResult> {
+  const cfg = printerConfig(shop)
+  if (!cfg.enabled) {
+    fallback()
+    return { direct: false }
+  }
+  try {
+    await sendToPrinter(makeBytes(), cfg)
+    return { direct: true }
+  } catch (e) {
+    fallback()
+    return { direct: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export function printTicket(order: Order, shop: Shop): Promise<PrintResult> {
+  return direct(
+    () => ticketBytes(order, shop, { cut: shop.printerCut, beep: shop.printerBeep }),
+    shop,
+    () => browserTicket(order, shop),
+  )
+}
+
+export function printZReport(
+  session: Session,
+  orders: Order[],
+  shop: Shop,
+  perCashier: { name: string; count: number; total: number }[],
+): Promise<PrintResult> {
+  return direct(
+    () => zReportBytes(session, orders, shop, perCashier, { cut: shop.printerCut, beep: false }),
+    shop,
+    () => browserZReport(session, orders, shop, perCashier),
+  )
+}
+
+function browserTicket(order: Order, shop: Shop) {
   const lines = order.lines
     .map(
       (l) => `<tr>
@@ -77,7 +122,7 @@ export function printTicket(order: Order, shop: Shop) {
   )
 }
 
-export function printZReport(
+function browserZReport(
   session: Session,
   orders: Order[],
   shop: Shop,

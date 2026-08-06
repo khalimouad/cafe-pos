@@ -47,6 +47,12 @@ export type Shop = {
   phone: string
   currency: string
   footer: string
+  printerEnabled: boolean
+  printerAgentUrl: string
+  printerIp: string
+  printerPort: number
+  printerCut: boolean
+  printerBeep: boolean
 }
 
 export type DB = {
