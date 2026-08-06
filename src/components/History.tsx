@@ -49,10 +49,20 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
 
   const sessionOf = (id: string) => sessions.find((s) => s.id === id)
 
+  // Le gérant consulte souvent cet écran depuis son téléphone : on rappelle l'état
+  // de la caisse du poste, partagée par tous les appareils.
+  const current = sessions.find((s) => s.id === currentSessionId && !s.closedAt)
+
   return (
     <div className="page">
       <h1>{t('hist_title')}</h1>
       <p className="sub">{t('hist_sub')}</p>
+      <p className="sub">
+        <span className={`dot${current ? '' : ' off'}`} style={{ display: 'inline-block', marginInlineEnd: 8 }} />
+        {current
+          ? t('register_opened_by', { name: current.openedBy, time: timeFR(current.openedAt) })
+          : t('register_closed')}
+      </p>
 
       <div className="filters">
         {([['session', t('filter_session')], ['jour', t('filter_today')], ['tout', t('filter_all')]] as [Range, string][]).map(

@@ -125,9 +125,11 @@ export function useDB() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_orders' }, () => void reload())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_sessions' }, () => void reload())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_products' }, () => void reload())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_cashiers' }, () => void reload())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cafe_shop' }, () => void reload())
       .subscribe()
+
+    // Les caissiers ne sont pas écoutés en temps réel : leur table n'est pas lisible
+    // par le client (codes protégés). Le rafraîchissement périodique s'en charge.
 
     // Filet de sécurité si le canal temps réel tombe (réseau du café).
     const poll = setInterval(() => void reload(), 60_000)

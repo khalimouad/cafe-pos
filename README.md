@@ -51,6 +51,22 @@ vérifiés par la fonction `cafe_verify_pin`. Après 5 essais ratés, le profil 
 5. **Fermeture de caisse** — récapitulatif (tickets, ventes, fond de caisse, détail par
    caissier), saisie des espèces comptées, calcul de l'écart, puis impression du rapport Z.
 
+## Plusieurs appareils, une seule caisse
+
+Le poste du café et le téléphone du gérant regardent la **même** caisse : la session
+ouverte, les commandes, l'historique et la carte vivent en base, pas dans le navigateur.
+
+- Une seule caisse peut être ouverte à la fois, garanti par un index unique en base :
+  impossible d'en ouvrir une deuxième depuis un autre appareil.
+- Ce que fait le poste apparaît sur le téléphone **en direct**, sans rien recharger
+  (Supabase Realtime, avec un rafraîchissement de secours toutes les 60 secondes).
+- Chaque appareil reste connecté : le téléphone ne redemande pas le code à chaque
+  ouverture. Le bouton **Changer** déconnecte l'appareil.
+- Fermer la caisse depuis le poste bascule aussi le téléphone sur « Caisse fermée ».
+- Le **panier en cours** reste propre à l'appareil qui le compose : deux appareils
+  peuvent encaisser chacun leur commande sans se gêner, les tickets étant numérotés
+  par la base.
+
 ## Sur téléphone
 
 - Barre de navigation en bas : Caisse, Historique, Réglages, Fermer la caisse

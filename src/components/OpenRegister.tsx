@@ -21,6 +21,7 @@ export default function OpenRegister({ cashierName, currency, busy, onOpen }: Pr
       <div className="panel">
         <h1>{t('open_title')}</h1>
         <p className="sub">{t('open_sub', { name: cashierName })}</p>
+        <p className="sub">{t('register_shared')}</p>
 
         <div className="field">
           <label>{t('open_float', { currency })}</label>

@@ -13,11 +13,14 @@ import type { Cashier, OrderLine } from './lib/types'
 
 type Tab = 'caisse' | 'historique' | 'reglages'
 
+const DEVICE_CASHIER = 'cafe-pos-cashier'
+
 export default function App() {
   const store = useDB()
   const { db, ready, error, reload } = store
   const { t } = useI18n()
   const [cashier, setCashier] = useState<Cashier | null>(null)
+  const [restored, setRestored] = useState(false)
   const [tab, setTab] = useState<Tab>('caisse')
   const [closing, setClosing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -35,10 +38,26 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [toast])
 
+  // L'appareil reste connecté d'une visite à l'autre : le téléphone du gérant ne
+  // redemande pas le code à chaque ouverture. Le caissier retenu doit toujours exister.
+  useEffect(() => {
+    if (!ready || restored) return
+    setRestored(true)
+    const id = localStorage.getItem(DEVICE_CASHIER)
+    const known = id ? db.cashiers.find((c) => c.id === id) : undefined
+    if (known) setCashier(known)
+  }, [ready, restored, db.cashiers])
+
   // Le caissier connecté a pu être supprimé depuis un autre appareil.
   useEffect(() => {
-    if (ready && cashier && !db.cashiers.some((c) => c.id === cashier.id)) setCashier(null)
+    if (ready && cashier && !db.cashiers.some((c) => c.id === cashier.id)) signIn(null)
   }, [db.cashiers, cashier, ready])
+
+  const signIn = (c: Cashier | null) => {
+    if (c) localStorage.setItem(DEVICE_CASHIER, c.id)
+    else localStorage.removeItem(DEVICE_CASHIER)
+    setCashier(c)
+  }
 
   const fail = (e: unknown) => setToast(`⚠️ ${e instanceof Error ? e.message : String(e)}`)
 
@@ -72,7 +91,7 @@ export default function App() {
         cashiers={db.cashiers}
         shopName={db.shop.name}
         verifyPin={store.verifyPin}
-        onLogin={setCashier}
+        onLogin={signIn}
       />
     )
   }
@@ -96,12 +115,13 @@ export default function App() {
         cashier={cashier}
         tab={tab}
         setTab={setTab}
-        onLogout={() => setCashier(null)}
+        onLogout={() => signIn(null)}
         sessionOpen={sessionOpen}
         sessionTotal={sessionTotal}
         currency={db.shop.currency}
         onCloseRegister={() => setClosing(true)}
         openedAt={openSession?.openedAt}
+        openedBy={openSession?.openedBy}
         offline={Boolean(error)}
       />
       <div className="main">{content}</div>
@@ -227,6 +247,7 @@ function Topbar({
   currency,
   onCloseRegister,
   openedAt,
+  openedBy,
   offline,
 }: {
   t: T
@@ -239,6 +260,7 @@ function Topbar({
   currency: string
   onCloseRegister: () => void
   openedAt?: string
+  openedBy?: string
   offline: boolean
 }) {
   return (
@@ -264,7 +286,9 @@ function Topbar({
         <span className={`dot${sessionOpen ? '' : ' off'}`} />
         {sessionOpen ? (
           <>
-            <span className="only-desktop">{t('register_open')} {openedAt ? timeFR(openedAt) : ''} ·&nbsp;</span>
+            <span className="only-desktop">
+              {openedBy && openedAt ? t('register_opened_by', { name: openedBy, time: timeFR(openedAt) }) : t('register_open')} ·&nbsp;
+            </span>
             <b>{money(sessionTotal, currency)}</b>
           </>
         ) : (
