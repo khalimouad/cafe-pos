@@ -68,8 +68,13 @@ function probeTcp(ip, port) {
 
 /* ------------------------------------------------------------------- USB */
 
-/** Le port USB d'une imprimante ESC/POS s'écrit comme un fichier. */
+const WINDOWS_USB_HINT =
+  'Sous Windows, un port USB (USB001…) ne s’écrit pas directement : choisissez le ' +
+  'branchement « Windows (imprimante installée) » et donnez le nom de l’imprimante.'
+
+/** Le port USB d'une imprimante ESC/POS s'écrit comme un fichier (Linux, macOS). */
 function sendDevice(device, payload) {
+  if (process.platform === 'win32') return Promise.reject(new Error(WINDOWS_USB_HINT))
   return new Promise((resolve, reject) => {
     fs.open(device, 'w', (err, fd) => {
       if (err) return reject(new Error(`${device} — ${err.message}`))
@@ -81,6 +86,7 @@ function sendDevice(device, payload) {
 }
 
 function probeDevice(device) {
+  if (process.platform === 'win32') return Promise.resolve({ ok: false, detail: WINDOWS_USB_HINT })
   return new Promise((resolve) => {
     fs.access(device, fs.constants.W_OK, (err) =>
       resolve(err ? { ok: false, detail: err.code === 'EACCES' ? `droits insuffisants sur ${device}` : err.message } : { ok: true }),

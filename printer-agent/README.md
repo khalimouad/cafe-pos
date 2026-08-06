@@ -59,6 +59,13 @@ sudo systemctl enable --now cafe-printer-agent
 
 ## Imprimante branchée en USB
 
+> **Sous Windows, ne choisissez pas « USB ».** Le port `USB001` affiché dans les
+> propriétés de l'imprimante n'est pas accessible en écriture directe : c'est le
+> spouleur Windows qui le pilote. Choisissez **Windows (imprimante installée)** et
+> donnez le nom de l'imprimante (ex. `printer WD8260`) — le ticket passera bien par le
+> câble USB. Le branchement *USB* de la liste ne concerne que Linux et macOS, où le
+> port apparaît comme un fichier `/dev/usb/lp0`.
+
 La même imprimante fonctionne aussi en USB : le POS ne change pas, seul le
 **branchement** choisi dans les réglages diffère. L'agent reste indispensable, un
 navigateur ne pouvant pas plus écrire sur un port USB qu'ouvrir une socket TCP.
