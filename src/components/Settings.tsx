@@ -88,6 +88,7 @@ export default function Settings({ db, store }: Props) {
               <label>{label}</label>
               <input
                 className="input"
+                key={`${key}-${db.shop[key]}`}
                 defaultValue={db.shop[key]}
                 onBlur={(e) => {
                   if (e.target.value !== db.shop[key]) void run(() => store.updateShop({ [key]: e.target.value }))
@@ -116,6 +117,7 @@ export default function Settings({ db, store }: Props) {
                     className="input tiny"
                     dir="ltr"
                     inputMode="decimal"
+                    key={`price-${p.id}-${p.price}`}
                     defaultValue={String(p.price)}
                     onBlur={(e) => {
                       const price = Number(e.target.value.replace(',', '.'))

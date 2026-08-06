@@ -23,6 +23,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 const PORT = Number(process.env.PORT ?? 7777)
 const HOST = process.env.HOST ?? '0.0.0.0'
@@ -30,6 +31,9 @@ const DEFAULT_IP = process.env.PRINTER_IP ?? '192.168.123.100'
 const DEFAULT_PORT = Number(process.env.PRINTER_PORT ?? 9100)
 const CONNECT_TIMEOUT = Number(process.env.PRINTER_TIMEOUT ?? 5000)
 const MAX_BODY = 4 * 1024 * 1024
+// Le POS lui-même peut être servi par l'agent : même origine, donc aucun souci de
+// navigateur (HTTPS vers HTTP, CORS) et une seule chose à lancer sur le poste.
+const WEB_DIR = process.env.WEB_DIR ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
 
 const log = (...a) => console.log(new Date().toLocaleTimeString('fr-FR'), ...a)
 
@@ -268,6 +272,34 @@ const describe = (t) =>
 
 /* ---------------------------------------------------------------- serveur */
 
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json; charset=utf-8',
+  '.woff2': 'font/woff2',
+}
+
+/** Sert le POS construit (dossier dist/), avec repli sur index.html. */
+async function serveWeb(req, res, pathname) {
+  if (!fs.existsSync(WEB_DIR)) return false
+  const clean = path.normalize(pathname).replace(/^([/\\.]+)/, '')
+  let file = path.join(WEB_DIR, clean)
+  if (!file.startsWith(WEB_DIR)) return false
+  if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(WEB_DIR, 'index.html')
+  if (!fs.existsSync(file)) return false
+  const body = await fs.promises.readFile(file)
+  res.writeHead(200, {
+    'content-type': MIME[path.extname(file)] ?? 'application/octet-stream',
+    'cache-control': path.extname(file) === '.html' ? 'no-cache' : 'max-age=3600',
+  })
+  res.end(body)
+  return true
+}
+
 const cors = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET,POST,OPTIONS',
@@ -328,10 +360,14 @@ http
       }
     }
 
+    if (req.method === 'GET' && (await serveWeb(req, res, url.pathname))) return
+
     json(res, 404, { error: 'Route inconnue' })
   })
   .listen(PORT, HOST, () => {
     log(`agent d'impression prêt sur http://${HOST}:${PORT}`)
+    if (fs.existsSync(WEB_DIR)) log(`POS servi depuis ${WEB_DIR} — ouvrez http://<ip-du-poste>:${PORT}`)
+    else log(`aucun POS à servir (dossier ${WEB_DIR} absent) : l'agent ne fait que l'impression`)
     log(`réseau par défaut : ${DEFAULT_IP}:${DEFAULT_PORT}`)
     const usb = listDevices()
     if (usb.length) log(`ports USB détectés : ${usb.join(', ')}`)

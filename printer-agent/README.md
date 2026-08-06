@@ -17,6 +17,22 @@ D'après son autotest :
 | Largeur d'impression | 72 mm, soit 576 points |
 | Massicot / bipeur | oui |
 
+## Le plus simple : laisser l'agent servir le POS
+
+Si le dossier `dist/` du POS est présent à côté (c'est le cas dans ce dépôt après
+`npm run build`), l'agent le sert lui-même. Le POS et l'impression partagent alors la
+**même adresse**, ce qui supprime d'un coup les trois causes classiques de « Failed to
+fetch » : mauvaise IP, blocage HTTPS → HTTP, et restrictions entre origines.
+
+```bash
+npm install && npm run build     # à la racine du dépôt, une fois
+node printer-agent/agent.mjs     # sur le poste du café
+```
+
+Puis ouvrir **http://IP-DU-POSTE:7777** — sur le poste comme sur le téléphone du gérant.
+Le réglage *Adresse de l'agent* reste sur `auto` : le POS s'adresse à l'agent qui l'a
+servi, quelle que soit l'IP du poste.
+
 ## Installation sur le poste du café
 
 1. Installer [Node.js](https://nodejs.org) 18 ou plus.
@@ -117,6 +133,26 @@ boutons **Tester la connexion** et **Imprimer un ticket de test** vérifient le 
 
 Si l'agent ou l'imprimante ne répond pas, le POS bascule automatiquement sur le dialogue
 d'impression du navigateur : le ticket sort quand même.
+
+## « Failed to fetch » : que vérifier
+
+Dans l'ordre :
+
+1. **L'agent tourne-t-il ?** Sur le poste, ouvrir <http://127.0.0.1:7777/health> : du
+   texte JSON doit s'afficher.
+2. **Depuis le téléphone**, ouvrir `http://IP-DU-POSTE:7777/health`. Rien ne vient ? Le
+   pare-feu Windows bloque le port :
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "POS Cafe - agent impression" `
+     -Direction Inbound -Protocol TCP -LocalPort 7777 -Action Allow -Profile Private
+   ```
+
+3. **La page du POS est-elle en HTTPS ?** Un navigateur refuse d'appeler une adresse en
+   HTTP depuis une page HTTPS. Le POS le détecte et l'affiche. Solution : ouvrir le POS
+   depuis l'agent (voir plus haut).
+4. **L'IP du poste a changé ?** Avec `auto`, la question ne se pose plus ; sinon, penser
+   à réserver l'adresse dans la box.
 
 ## Vérifier à la main
 

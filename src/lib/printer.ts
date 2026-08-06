@@ -17,9 +17,22 @@ export type PrinterConfig = {
   beep: boolean
 }
 
+/**
+ * « auto » (ou vide) : l'agent est celui qui sert cette page. C'est le cas quand le POS
+ * est ouvert depuis http://ip-du-poste:7777, et cela évite de saisir — puis de tenir à
+ * jour — l'adresse IP du poste.
+ */
+export function resolveAgentUrl(value: string) {
+  const v = value.trim().replace(/\/+$/, '')
+  if (!v || v.toLowerCase() === 'auto') {
+    return typeof location !== 'undefined' ? location.origin : ''
+  }
+  return v
+}
+
 export const printerConfig = (shop: Shop): PrinterConfig => ({
   enabled: shop.printerEnabled,
-  agentUrl: shop.printerAgentUrl.replace(/\/+$/, ''),
+  agentUrl: resolveAgentUrl(shop.printerAgentUrl),
   transport: shop.printerTransport,
   target: shop.printerTarget,
   ip: shop.printerIp,
@@ -40,6 +53,14 @@ function query(cfg: PrinterConfig) {
   return p.toString()
 }
 
+/**
+ * Une page servie en HTTPS ne peut pas appeler une adresse en HTTP : le navigateur
+ * bloque avant même d'essayer, et l'erreur ressemble à un agent éteint.
+ */
+export function mixedContentBlocked(cfg: PrinterConfig) {
+  return typeof location !== 'undefined' && location.protocol === 'https:' && cfg.agentUrl.startsWith('http://')
+}
+
 export async function sendToPrinter(bytes: Uint8Array, cfg: PrinterConfig, timeoutMs = 8000) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
@@ -50,7 +71,18 @@ export async function sendToPrinter(bytes: Uint8Array, cfg: PrinterConfig, timeo
       body: bytes.slice().buffer as ArrayBuffer,
       signal: ctrl.signal,
     })
-    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 160)}`)
+    if (!res.ok) {
+      // L'agent a répondu : l'erreur vient de l'imprimante, pas de la liaison.
+      let detail = (await res.text()).slice(0, 200)
+      try {
+        detail = String(JSON.parse(detail).error ?? detail)
+      } catch {
+        // réponse non JSON : on garde le texte brut
+      }
+      const err = new Error(detail)
+      err.name = 'AgentError'
+      throw err
+    }
   } finally {
     clearTimeout(timer)
   }

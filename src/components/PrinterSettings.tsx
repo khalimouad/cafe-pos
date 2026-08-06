@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { PrinterTransport, Shop } from '../lib/types'
 import { testBytes } from '../lib/escpos'
-import { pingPrinter, printerConfig, sendToPrinter } from '../lib/printer'
+import { mixedContentBlocked, pingPrinter, printerConfig, sendToPrinter } from '../lib/printer'
 import { useI18n } from '../lib/i18n'
 import { errorText } from '../lib/store'
 
@@ -22,6 +22,13 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
   const cfg = printerConfig(shop)
   const network = shop.printerTransport === 'tcp'
 
+  // « Failed to fetch » ne dit pas pourquoi : on nomme la cause quand on la connaît.
+  const diagnose = (e: unknown) => {
+    if (e instanceof Error && e.name === 'AgentError') return t('printer_refused', { detail: e.message })
+    if (mixedContentBlocked(cfg)) return t('printer_mixed_content', { url: cfg.agentUrl })
+    return t('printer_no_agent', { detail: errorText(e), url: `${cfg.agentUrl}/health` })
+  }
+
   const check = async () => {
     setBusy(true)
     setStatus(null)
@@ -35,7 +42,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
           : { ok: false, text: t('printer_unreachable', { detail: r.detail ?? '' }) },
       )
     } catch (e) {
-      setStatus({ ok: false, text: t('printer_no_agent', { detail: errorText(e) }) })
+      setStatus({ ok: false, text: diagnose(e) })
     } finally {
       setBusy(false)
     }
@@ -48,7 +55,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
       await sendToPrinter(testBytes(shop, { cut: shop.printerCut, beep: shop.printerBeep }), cfg)
       setStatus({ ok: true, text: t('printer_test_sent') })
     } catch (e) {
-      setStatus({ ok: false, text: errorText(e) })
+      setStatus({ ok: false, text: diagnose(e) })
     } finally {
       setBusy(false)
     }
@@ -102,6 +109,9 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
           <div className="field" style={{ margin: 0 }}>
             <label>{t('printer_agent_url')}</label>
             {text('printerAgentUrl')}
+            <p className="sub" style={{ margin: '6px 0 0' }}>
+              {t('printer_agent_hint', { url: cfg.agentUrl })}
+            </p>
           </div>
 
           {network ? (
@@ -116,6 +126,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
                   className="input"
                   dir="ltr"
                   inputMode="numeric"
+                  key={`port-${shop.printerPort}`}
                   defaultValue={String(shop.printerPort)}
                   onBlur={(e) => {
                     const port = Number(e.target.value)

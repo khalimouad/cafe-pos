@@ -112,6 +112,11 @@ Un navigateur ne peut ni ouvrir une socket TCP ni écrire sur un port USB : un p
 agent Node tourne donc sur le poste du café et fait le pont. Voir
 **[`printer-agent/`](printer-agent/)** pour l'installation et le démarrage automatique.
 
+Le plus simple est de laisser cet agent **servir aussi le POS** (`node
+printer-agent/agent.mjs` après `npm run build`, puis ouvrir `http://IP-DU-POSTE:7777`) :
+page et impression partagent la même adresse, et le réglage *Adresse de l'agent* peut
+rester sur `auto`.
+
 L'imprimante peut être branchée **en réseau** (IP fixe `192.168.123.100`, port brut
 `9100` — le montage actuel) ou **en USB** ; le branchement se choisit dans les réglages :
 réseau, USB (`/dev/usb/lp0` sous Linux), file d'impression CUPS, ou imprimante installée
