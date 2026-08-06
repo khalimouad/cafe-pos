@@ -67,7 +67,11 @@ alter table public.cafe_shop
   add column if not exists printer_ip text not null default '192.168.123.100',
   add column if not exists printer_port int not null default 9100,
   add column if not exists printer_cut boolean not null default true,
-  add column if not exists printer_beep boolean not null default false;
+  add column if not exists printer_beep boolean not null default false,
+  -- Branchement : réseau (TCP 9100), USB direct, file CUPS ou partage Windows.
+  add column if not exists printer_transport text not null default 'tcp'
+    check (printer_transport in ('tcp', 'usb', 'cups', 'windows')),
+  add column if not exists printer_target text not null default '';
 
 alter table public.cafe_shop enable row level security;
 alter table public.cafe_cashiers enable row level security;

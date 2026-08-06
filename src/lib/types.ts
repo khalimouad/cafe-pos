@@ -1,3 +1,5 @@
+export type PrinterTransport = 'tcp' | 'usb' | 'cups' | 'windows'
+
 export type Cashier = {
   id: string
   name: string
@@ -48,6 +50,8 @@ export type Shop = {
   currency: string
   footer: string
   printerEnabled: boolean
+  printerTransport: PrinterTransport
+  printerTarget: string
   printerAgentUrl: string
   printerIp: string
   printerPort: number

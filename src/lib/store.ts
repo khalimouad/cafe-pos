@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
-import type { Cashier, DB, Order, OrderLine, Product, Session, Shop } from './types'
+import type { Cashier, DB, Order, OrderLine, PrinterTransport, Product, Session, Shop } from './types'
 
 const EMPTY: DB = {
   shop: {
@@ -10,6 +10,8 @@ const EMPTY: DB = {
     currency: 'DH',
     footer: '',
     printerEnabled: false,
+    printerTransport: 'tcp',
+    printerTarget: '',
     printerAgentUrl: 'http://127.0.0.1:7777',
     printerIp: '192.168.123.100',
     printerPort: 9100,
@@ -31,6 +33,8 @@ const toShop = (r: Row): Shop => ({
   currency: String(r.currency ?? 'DH'),
   footer: String(r.footer ?? ''),
   printerEnabled: Boolean(r.printer_enabled),
+  printerTransport: (String(r.printer_transport ?? 'tcp') as PrinterTransport),
+  printerTarget: String(r.printer_target ?? ''),
   printerAgentUrl: String(r.printer_agent_url ?? 'http://127.0.0.1:7777'),
   printerIp: String(r.printer_ip ?? '192.168.123.100'),
   printerPort: Number(r.printer_port ?? 9100),
@@ -193,6 +197,8 @@ function useActions(reload: () => Promise<void>) {
         currency: 'currency',
         footer: 'footer',
         printerEnabled: 'printer_enabled',
+        printerTransport: 'printer_transport',
+        printerTarget: 'printer_target',
         printerAgentUrl: 'printer_agent_url',
         printerIp: 'printer_ip',
         printerPort: 'printer_port',

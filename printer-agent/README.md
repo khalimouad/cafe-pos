@@ -57,11 +57,45 @@ WantedBy=multi-user.target
 sudo systemctl enable --now cafe-printer-agent
 ```
 
+## Imprimante branchée en USB
+
+La même imprimante fonctionne aussi en USB : le POS ne change pas, seul le
+**branchement** choisi dans les réglages diffère. L'agent reste indispensable, un
+navigateur ne pouvant pas plus écrire sur un port USB qu'ouvrir une socket TCP.
+
+| Système | Branchement à choisir | Cible à renseigner |
+|---------|----------------------|--------------------|
+| Linux | **USB** | `/dev/usb/lp0` (l'agent liste les ports détectés) |
+| macOS | **File d'impression CUPS** | nom de la file, ex. `POS80` |
+| Linux (via CUPS) | **File d'impression CUPS** | nom de la file, ex. `POS80` |
+| Windows | **Imprimante partagée Windows** | `\\localhost\POS80` |
+
+**Linux** — le port apparaît en `/dev/usb/lp0`. Si l'agent répond « droits
+insuffisants », ajouter l'utilisateur au groupe propriétaire du port :
+
+```bash
+ls -l /dev/usb/lp0            # ex. root lp
+sudo usermod -aG lp $USER     # puis se reconnecter
+```
+
+**Windows** — installer le pilote de l'imprimante, la partager sous un nom court
+(clic droit → Propriétés → Partage, ex. `POS80`), puis choisir *Imprimante partagée
+Windows* avec la cible `\\localhost\POS80`. L'agent envoie les octets bruts par
+`copy /b`, sans passer par le rendu du pilote.
+
+**macOS / Linux avec CUPS** — créer une file en mode brut :
+
+```bash
+lpadmin -p POS80 -E -v usb://... -m raw     # lpinfo -v liste les URI USB
+```
+
 ## Réglage dans le POS
 
-**Réglages → Imprimante ticket** : activer l'impression directe, renseigner l'adresse de
-l'agent (`http://127.0.0.1:7777` sur le poste lui-même, ou `http://IP-DU-POSTE:7777`
-depuis un téléphone), l'IP et le port de l'imprimante, puis **Tester l'impression**.
+**Réglages → Imprimante ticket** : activer l'impression directe, choisir le
+**branchement** (réseau, USB, CUPS ou partage Windows), renseigner l'adresse de l'agent
+(`http://127.0.0.1:7777` sur le poste lui-même, ou `http://IP-DU-POSTE:7777` depuis un
+téléphone) puis la cible correspondante — IP et port en réseau, port USB sinon. Les
+boutons **Tester la connexion** et **Imprimer un ticket de test** vérifient le montage.
 
 Si l'agent ou l'imprimante ne répond pas, le POS bascule automatiquement sur le dialogue
 d'impression du navigateur : le ticket sort quand même.
@@ -69,9 +103,15 @@ d'impression du navigateur : le ticket sort quand même.
 ## Vérifier à la main
 
 ```bash
-curl "http://127.0.0.1:7777/health?ip=192.168.123.100&port=9100"
+# réseau
+curl "http://127.0.0.1:7777/health?transport=tcp&ip=192.168.123.100&port=9100"
 printf 'Test\n\n\n\n' | curl -X POST --data-binary @- \
-  "http://127.0.0.1:7777/print?ip=192.168.123.100&port=9100"
+  "http://127.0.0.1:7777/print?transport=tcp&ip=192.168.123.100&port=9100"
+
+# USB (la réponse /health liste aussi les ports USB détectés)
+curl "http://127.0.0.1:7777/health?transport=usb&target=/dev/usb/lp0"
+printf 'Test\n\n\n\n' | curl -X POST --data-binary @- \
+  "http://127.0.0.1:7777/print?transport=usb&target=/dev/usb/lp0"
 ```
 
 ## Sécurité

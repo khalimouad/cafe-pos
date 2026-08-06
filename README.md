@@ -90,10 +90,14 @@ un ticket qui n'existe pas en base.
 
 Le ticket part **directement** sur l'imprimante thermique 80 mm, sans boîte de dialogue.
 
-L'imprimante est en réseau (IP fixe `192.168.123.100`, port brut `9100`). Un navigateur
-ne pouvant pas ouvrir de socket TCP, un petit agent Node tourne sur le poste du café et
-fait le pont : voir **[`printer-agent/`](printer-agent/)** pour l'installation et le
-démarrage automatique.
+Un navigateur ne peut ni ouvrir une socket TCP ni écrire sur un port USB : un petit
+agent Node tourne donc sur le poste du café et fait le pont. Voir
+**[`printer-agent/`](printer-agent/)** pour l'installation et le démarrage automatique.
+
+L'imprimante peut être branchée **en réseau** (IP fixe `192.168.123.100`, port brut
+`9100` — le montage actuel) ou **en USB** ; le branchement se choisit dans les réglages :
+réseau, USB (`/dev/usb/lp0` sous Linux), file d'impression CUPS, ou imprimante partagée
+Windows.
 
 Le ticket est dessiné par le navigateur puis envoyé en image raster ESC/POS (`GS v 0`),
 suivi de la coupe (`GS V 66`) et du bip optionnel. C'est le navigateur qui compose
