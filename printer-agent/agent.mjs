@@ -305,6 +305,9 @@ const cors = {
   'access-control-allow-methods': 'GET,POST,OPTIONS',
   'access-control-allow-headers': 'content-type',
   'access-control-max-age': '86400',
+  // Chrome et Edge exigent cet accord pour qu'un site public appelle une machine du
+  // réseau local : sans lui, un POS hébergé en https ne peut pas joindre cet agent.
+  'access-control-allow-private-network': 'true',
 }
 
 const json = (res, code, body) => {

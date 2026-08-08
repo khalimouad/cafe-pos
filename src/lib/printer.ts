@@ -22,12 +22,15 @@ export type PrinterConfig = {
  * est ouvert depuis http://ip-du-poste:7777, et cela évite de saisir — puis de tenir à
  * jour — l'adresse IP du poste.
  */
+export const LOCAL_AGENT = 'http://127.0.0.1:7777'
+
 export function resolveAgentUrl(value: string) {
   const v = value.trim().replace(/\/+$/, '')
-  if (!v || v.toLowerCase() === 'auto') {
-    return typeof location !== 'undefined' ? location.origin : ''
-  }
-  return v
+  if (v && v.toLowerCase() !== 'auto') return v
+  if (typeof location === 'undefined') return LOCAL_AGENT
+  // Page servie par l'agent (http) : c'est lui. Page hébergée en https : elle ne peut
+  // joindre que l'agent local du poste, seule adresse http tolérée depuis du https.
+  return location.protocol === 'http:' ? location.origin : LOCAL_AGENT
 }
 
 export const printerConfig = (shop: Shop): PrinterConfig => ({
@@ -58,7 +61,11 @@ function query(cfg: PrinterConfig) {
  * bloque avant même d'essayer, et l'erreur ressemble à un agent éteint.
  */
 export function mixedContentBlocked(cfg: PrinterConfig) {
-  return typeof location !== 'undefined' && location.protocol === 'https:' && cfg.agentUrl.startsWith('http://')
+  if (typeof location === 'undefined' || location.protocol !== 'https:') return false
+  if (!cfg.agentUrl.startsWith('http://')) return false
+  // 127.0.0.1 et localhost restent autorisés depuis une page https : le navigateur les
+  // considère comme sûrs. Une autre adresse locale (192.168.x.y) est bloquée.
+  return !/^http:\/\/(127\.0\.0\.1|localhost)(:|$|\/)/.test(cfg.agentUrl)
 }
 
 export async function sendToPrinter(bytes: Uint8Array, cfg: PrinterConfig, timeoutMs = 8000) {

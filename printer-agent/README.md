@@ -134,6 +134,22 @@ boutons **Tester la connexion** et **Imprimer un ticket de test** vérifient le 
 Si l'agent ou l'imprimante ne répond pas, le POS bascule automatiquement sur le dialogue
 d'impression du navigateur : le ticket sort quand même.
 
+## POS hébergé en ligne (https) et agent sur le poste
+
+Si le POS est ouvert depuis une adresse **https** (hébergement en ligne) et non depuis
+l'agent, le navigateur n'autorise qu'**une seule** adresse http : celle de la machine
+elle-même, `http://127.0.0.1:7777`. C'est ce que `auto` choisit tout seul dans ce cas.
+
+Conséquences à connaître :
+
+- **sur le poste du café**, l'impression fonctionne : la page https appelle l'agent local ;
+- **depuis le téléphone**, elle ne peut pas : `http://192.168.1.x:7777` est refusé par le
+  navigateur au nom du contenu mixte. Pour imprimer depuis un autre appareil, ouvrez le
+  POS depuis l'agent (`http://IP-DU-POSTE:7777`) plutôt que depuis l'adresse en ligne.
+
+L'agent répond à l'autorisation « accès au réseau privé » que Chrome et Edge exigent dans
+ce montage ; rien à configurer de votre côté.
+
 ## « Failed to fetch » : que vérifier
 
 Dans l'ordre :
@@ -148,9 +164,10 @@ Dans l'ordre :
      -Direction Inbound -Protocol TCP -LocalPort 7777 -Action Allow -Profile Private
    ```
 
-3. **La page du POS est-elle en HTTPS ?** Un navigateur refuse d'appeler une adresse en
-   HTTP depuis une page HTTPS. Le POS le détecte et l'affiche. Solution : ouvrir le POS
-   depuis l'agent (voir plus haut).
+3. **La page du POS est-elle en HTTPS ?** Elle ne peut alors joindre que
+   `http://127.0.0.1:7777`. Une erreur « NOT_FOUND » venant du site hébergé signifie que
+   le POS a cherché l'agent à sa propre adresse : laissez le réglage sur `auto`, il
+   choisit désormais l'agent local dans ce cas.
 4. **L'IP du poste a changé ?** Avec `auto`, la question ne se pose plus ; sinon, penser
    à réserver l'adresse dans la box.
 
