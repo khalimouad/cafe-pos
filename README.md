@@ -67,6 +67,22 @@ ouverte, les commandes, l'historique et la carte vivent en base, pas dans le nav
   peuvent encaisser chacun leur commande sans se gêner, les tickets étant numérotés
   par la base.
 
+## Installer comme application, sur le poste
+
+Le POS est une application installable (Chrome, Edge) : manifeste, icônes et service
+worker sont fournis. Menu du navigateur → **Installer cette application** : elle obtient
+son icône, son entrée au menu Démarrer et sa propre fenêtre, sans barre d'adresse.
+
+**Attention :** installer l'application ne supprime pas la boîte de dialogue
+d'impression — aucune page web ne peut la désactiver. Pour un ticket qui sort sans rien
+demander, deux possibilités, détaillées dans **[`windows/`](windows/)** :
+
+- le raccourci `windows/Lancer-POS-Cafe.cmd`, qui démarre l'agent puis ouvre le
+  navigateur en plein écran avec `--kiosk-printing` (impression silencieuse sur
+  l'imprimante **par défaut** de Windows) ;
+- ou l'**impression directe** du POS (Réglages → Imprimante ticket), qui envoie
+  l'ESC/POS à l'imprimante par l'agent, coupe et bip compris.
+
 ## Sur téléphone
 
 - Barre de navigation en bas : Caisse, Historique, Réglages, Fermer la caisse
