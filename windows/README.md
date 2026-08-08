@@ -62,6 +62,46 @@ qu'elle soit aussi **sans dialogue d'impression**, lancez-la plutôt par le racc
 ci-dessus : une application installée ne peut pas ajouter le drapeau `--kiosk-printing`
 elle-même.
 
+## Le dialogue s'affiche encore : les trois causes
+
+Le drapeau `--kiosk-printing` ne vaut **que pour la fenêtre lancée avec lui**. Ouvrir le
+POS autrement — icône Edge habituelle, application installée, onglet déjà ouvert — fait
+revenir le dialogue.
+
+### 1. Vérifier que le drapeau est bien actif
+
+Dans la fenêtre où le dialogue apparaît, ouvrir un nouvel onglet sur **`edge://version`**
+(ou `chrome://version`) et regarder la ligne **Ligne de commande**. Elle doit contenir
+`--kiosk-printing`. Si elle ne le contient pas, la fenêtre n'a pas été lancée par le
+raccourci.
+
+### 2. Edge était déjà ouvert
+
+Si une fenêtre Edge tourne déjà avec le même profil, la nouvelle demande lui est
+simplement transmise et **les drapeaux sont ignorés**. Le raccourci fourni évite cela en
+utilisant un profil dédié (`--user-data-dir`). En cas de doute : fermer toutes les
+fenêtres Edge, puis relancer `Lancer-POS-Cafe.cmd`.
+
+### 3. Vous utilisez l'application installée
+
+Une application installée ne peut pas ajouter le drapeau elle-même. Deux solutions :
+
+- lancer le POS par **`Lancer-POS-Cafe.cmd`** plutôt que par l'icône de l'application ;
+- ou exécuter **`Ajouter-kiosk-printing-a-l-app-installee.ps1`** (clic droit → *Exécuter
+  avec PowerShell*), qui ajoute `--kiosk-printing` au raccourci de l'application
+  installée. Refermer complètement la fenêtre de l'application, puis la rouvrir par son
+  raccourci.
+
+## La solution qui ne dépend pas du navigateur
+
+L'**impression directe** du POS (Réglages → Imprimante ticket → *Impression directe :
+Oui*) ne passe pas par le navigateur du tout : le ticket est envoyé à l'imprimante par
+l'agent. Aucun dialogue, quel que soit le mode de lancement, et en prime la coupe
+automatique et le bip — que `--kiosk-printing` ne sait pas piloter.
+
+L'agent tourne déjà si vous utilisez `Lancer-POS-Cafe.cmd` : il n'y a qu'à activer le
+réglage.
+
 ## Sortir du mode kiosque
 
 `Alt + F4` ferme la fenêtre. `Ctrl + W` et la touche Windows restent disponibles.

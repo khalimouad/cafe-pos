@@ -51,6 +51,7 @@ rem  --user-data-dir   : profil dedie, pour ne pas melanger avec la navigation p
 start "" "%BROWSER%" ^
   --kiosk "%POS_URL%" ^
   --kiosk-printing ^
+  --edge-kiosk-type=fullscreen ^
   --no-first-run ^
   --disable-features=Translate,AutofillServerCommunication ^
   --user-data-dir="%LocalAppData%\CafePOS\profil"
