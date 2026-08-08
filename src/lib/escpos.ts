@@ -1,5 +1,5 @@
 import type { Order, Session, Shop } from './types'
-import { dateFR, money } from './store'
+import { dateFR, isActive, money } from './store'
 import { getLang, translate } from './i18n'
 
 /**
@@ -172,7 +172,9 @@ export function zReportBytes(
   perCashier: { name: string; count: number; total: number }[],
   opts: PrintOptions,
 ) {
-  const total = orders.reduce((s, o) => s + o.total, 0)
+  const active = orders.filter(isActive)
+  const cancelled = orders.filter((o) => !isActive(o))
+  const total = active.reduce((s, o) => s + o.total, 0)
   const expected = session.openingFloat + total
   const counted = session.countedCash ?? expected
 
@@ -190,7 +192,10 @@ export function zReportBytes(
   t.row(tp('tk_closed_by'), session.closedBy ?? '-', 20)
   t.separator()
 
-  t.row(tp('tk_count'), String(orders.length), 22)
+  t.row(tp('tk_count'), String(active.length), 22)
+  if (cancelled.length) {
+    t.row(tp('tk_cancelled'), `${cancelled.length} · ${money(cancelled.reduce((s2, o) => s2 + o.total, 0), shop.currency)}`, 22)
+  }
   t.row(tp('tk_float'), money(session.openingFloat, shop.currency), 22)
   t.row(tp('tk_sales'), money(total, shop.currency), 22)
   t.separator()

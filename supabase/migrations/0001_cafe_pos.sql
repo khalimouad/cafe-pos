@@ -57,6 +57,15 @@ create table if not exists public.cafe_orders (
   total numeric(10,2) not null check (total >= 0)
 );
 
+-- Une commande annulée n'est pas effacée : elle reste dans l'historique, marquée,
+-- et sort des totaux. Le gérant voit ainsi ce qui a été annulé, par qui et quand.
+alter table public.cafe_orders
+  add column if not exists cancelled_at timestamptz,
+  add column if not exists cancelled_by text;
+
+create index if not exists cafe_orders_active_idx
+  on public.cafe_orders (session_id) where cancelled_at is null;
+
 create index if not exists cafe_orders_session_idx on public.cafe_orders (session_id);
 create index if not exists cafe_orders_created_idx on public.cafe_orders (created_at desc);
 
@@ -239,6 +248,57 @@ revoke all on function public.cafe_delete_cashier(uuid) from public;
 grant execute on function public.cafe_add_cashier(text, text, boolean) to anon, authenticated;
 grant execute on function public.cafe_set_cashier_pin(uuid, text) to anon, authenticated;
 grant execute on function public.cafe_delete_cashier(uuid) to anon, authenticated;
+
+-- Annulation d'une commande : réservée au responsable, qui la valide avec son code.
+-- Le contrôle est fait en base : l'écran seul ne suffirait pas à l'empêcher.
+create or replace function public.cafe_cancel_order(p_order_id uuid, p_pin text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin text;
+  v_cancelled timestamptz;
+  v_session uuid;
+  v_closed timestamptz;
+begin
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'Code responsable incorrect.';
+  end if;
+
+  select name into v_admin from public.cafe_cashiers where admin and pin = p_pin limit 1;
+  if v_admin is null then
+    -- Ralentit les essais au hasard sur un code a 4 chiffres.
+    perform pg_sleep(0.4);
+    raise exception 'Code responsable incorrect.';
+  end if;
+
+  select cancelled_at, session_id into v_cancelled, v_session
+  from public.cafe_orders where id = p_order_id;
+
+  if v_session is null then
+    raise exception 'Cette commande n''existe plus.';
+  end if;
+  if v_cancelled is not null then
+    raise exception 'Cette commande est deja annulee.';
+  end if;
+
+  select closed_at into v_closed from public.cafe_sessions where id = v_session;
+  if v_closed is not null then
+    raise exception 'La caisse de cette commande est deja fermee : son rapport est edite.';
+  end if;
+
+  update public.cafe_orders
+  set cancelled_at = now(), cancelled_by = v_admin
+  where id = p_order_id;
+
+  return v_admin;
+end;
+$$;
+
+revoke all on function public.cafe_cancel_order(uuid, text) from public;
+grant execute on function public.cafe_cancel_order(uuid, text) to anon, authenticated;
 
 -- Temps réel : le poste et le téléphone voient les mêmes données sans rechargement.
 do $$

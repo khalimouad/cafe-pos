@@ -6,10 +6,10 @@ import History from './components/History'
 import CloseRegister from './components/CloseRegister'
 import Settings from './components/Settings'
 import LangSwitch from './components/LangSwitch'
-import { errorText, money, timeFR, useDB } from './lib/store'
+import { errorText, isActive, money, timeFR, useDB } from './lib/store'
 import { printTicket, printZReport } from './lib/print'
 import { useI18n, type T } from './lib/i18n'
-import type { Cashier, OrderLine } from './lib/types'
+import type { Cashier, Order, OrderLine } from './lib/types'
 
 type Tab = 'caisse' | 'historique' | 'reglages'
 
@@ -166,13 +166,18 @@ export default function App() {
     }
   }
 
+  const cancelOrder = async (order: Order, pin: string) => {
+    const by = await store.cancelOrder(order.id, pin)
+    setToast(t('toast_cancelled', { n: order.number, name: by }))
+  }
+
   const closeRegister = async (countedCash: number) => {
     setBusy(true)
     try {
       await store.closeSession(openSession.id, cashier.name, countedCash)
 
       const map = new Map<string, { name: string; count: number; total: number }>()
-      sessionOrders.forEach((o) => {
+      sessionOrders.filter(isActive).forEach((o) => {
         const key = o.cashierId ?? o.cashierName
         const e = map.get(key) ?? { name: o.cashierName, count: 0, total: 0 }
         e.count += 1
@@ -215,7 +220,7 @@ export default function App() {
     )
   }
 
-  const sessionTotal = sessionOrders.reduce((s, o) => s + o.total, 0)
+  const sessionTotal = sessionOrders.filter(isActive).reduce((s, o) => s + o.total, 0)
 
   return chrome(
     <>
@@ -227,6 +232,7 @@ export default function App() {
           cashiers={db.cashiers}
           shop={db.shop}
           currentSessionId={openSession.id}
+          onCancelOrder={cancelOrder}
         />
       )}
       {tab === 'reglages' && cashier.admin && <Settings db={db} store={store} />}

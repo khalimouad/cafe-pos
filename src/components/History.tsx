@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { Cashier, Order, Session, Shop } from '../lib/types'
-import { dateFR, money, timeFR } from '../lib/store'
+import { dateFR, isActive, money, timeFR } from '../lib/store'
 import { printTicket } from '../lib/print'
 import { useI18n } from '../lib/i18n'
+import CancelOrder from './CancelOrder'
 
 type Props = {
   orders: Order[]
@@ -10,15 +11,17 @@ type Props = {
   cashiers: Cashier[]
   shop: Shop
   currentSessionId: string | null
+  onCancelOrder?: (order: Order, pin: string) => Promise<void>
 }
 
 type Range = 'session' | 'jour' | 'tout'
 
-export default function History({ orders, sessions, cashiers, shop, currentSessionId }: Props) {
+export default function History({ orders, sessions, cashiers, shop, currentSessionId, onCancelOrder }: Props) {
   const { t } = useI18n()
   const [range, setRange] = useState<Range>(currentSessionId ? 'session' : 'jour')
   const [cashierId, setCashierId] = useState('tous')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [toCancel, setToCancel] = useState<Order | null>(null)
 
   const filtered = useMemo(() => {
     const today = new Date().toDateString()
@@ -32,12 +35,15 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
       .sort((a, b) => b.number - a.number)
   }, [orders, range, cashierId, currentSessionId])
 
-  const total = filtered.reduce((s, o) => s + o.total, 0)
-  const avg = filtered.length ? total / filtered.length : 0
+  // Une commande annulée reste affichée mais ne compte dans aucun total.
+  const active = filtered.filter(isActive)
+  const cancelled = filtered.filter((o) => !isActive(o))
+  const total = active.reduce((s, o) => s + o.total, 0)
+  const avg = active.length ? total / active.length : 0
 
   const perCashier = useMemo(() => {
     const map = new Map<string, { name: string; count: number; total: number }>()
-    filtered.forEach((o) => {
+    active.forEach((o) => {
       const key = o.cashierId ?? o.cashierName
       const e = map.get(key) ?? { name: o.cashierName, count: 0, total: 0 }
       e.count += 1
@@ -45,7 +51,7 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
       map.set(key, e)
     })
     return Array.from(map.values()).sort((a, b) => b.total - a.total)
-  }, [filtered])
+  }, [active])
 
   const sessionOf = (id: string) => sessions.find((s) => s.id === id)
 
@@ -88,7 +94,7 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
       <div className="stats">
         <div className="stat">
           <div className="k">{t('stat_orders')}</div>
-          <div className="v">{filtered.length}</div>
+          <div className="v">{active.length}</div>
         </div>
         <div className="stat">
           <div className="k">{t('stat_total')}</div>
@@ -98,6 +104,12 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
           <div className="k">{t('stat_avg')}</div>
           <div className="v">{money(avg, shop.currency)}</div>
         </div>
+        {cancelled.length > 0 && (
+          <div className="stat">
+            <div className="k">{t('stat_cancelled')}</div>
+            <div className="v red">{cancelled.length}</div>
+          </div>
+        )}
         {perCashier.slice(0, 1).map((c) => (
           <div className="stat" key={c.name}>
             <div className="k">{t('stat_best')}</div>
@@ -135,18 +147,28 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
             const s = sessionOf(o.sessionId)
             return (
               <div key={o.id}>
-                <div className="item" onClick={() => setOpenId(openId === o.id ? null : o.id)}>
+                <div className={`item${isActive(o) ? '' : ' cancelled'}`} onClick={() => setOpenId(openId === o.id ? null : o.id)}>
                   <div className="num">#{String(o.number).padStart(4, '0')}</div>
                   <div className="who">
                     <div className="n">
                       {o.cashierName} — {t('hist_items', { n: o.lines.reduce((s2, l) => s2 + l.qty, 0) })}
+                      {!isActive(o) && <span className="badge">{t('cancelled_badge')}</span>}
                     </div>
                     <div className="d">
-                      {dateFR(o.createdAt)}
-                      {s ? ` · ${t('hist_register_of', { date: new Date(s.openedAt).toLocaleDateString('fr-FR') })}` : ''}
+                      {isActive(o)
+                        ? `${dateFR(o.createdAt)}${s ? ` · ${t('hist_register_of', { date: new Date(s.openedAt).toLocaleDateString('fr-FR') })}` : ''}`
+                        : t('cancelled_by', { name: o.cancelledBy ?? '' })}
                     </div>
                   </div>
                   <div className="tot">{money(o.total, shop.currency)}</div>
+                  {onCancelOrder && isActive(o) && o.sessionId === currentSessionId && (
+                    <button
+                      className="btn danger small"
+                      onClick={(e) => { e.stopPropagation(); setToCancel(o) }}
+                    >
+                      {t('cancel_order')}
+                    </button>
+                  )}
                   <button
                     className="btn ghost small"
                     onClick={(e) => { e.stopPropagation(); void printTicket(o, shop) }}
@@ -172,6 +194,18 @@ export default function History({ orders, sessions, cashiers, shop, currentSessi
             )
           })}
         </div>
+      )}
+
+      {toCancel && onCancelOrder && (
+        <CancelOrder
+          order={toCancel}
+          shop={shop}
+          onCancel={() => setToCancel(null)}
+          onConfirm={async (pin) => {
+            await onCancelOrder(toCancel, pin)
+            setToCancel(null)
+          }}
+        />
       )}
     </div>
   )

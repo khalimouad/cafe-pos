@@ -226,6 +226,12 @@ input, select { font: inherit; }
 .item .who .n { font-weight: 600; font-size: 14px; }
 .item .who .d { font-size: 12px; color: var(--muted); }
 .item .tot { font-weight: 700; white-space: nowrap; }
+.item.cancelled .num, .item.cancelled .who .n, .item.cancelled .tot { text-decoration: line-through; opacity: 0.55; }
+.badge {
+  display: inline-block; margin-inline-start: 8px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(239, 77, 90, 0.15); color: #ff8d96; font-size: 11px; font-weight: 700;
+  text-decoration: none; vertical-align: middle;
+}
 
 .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
 

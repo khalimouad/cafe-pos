@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Order, Session, Shop } from '../lib/types'
-import { dateFR, money } from '../lib/store'
+import { dateFR, isActive, money } from '../lib/store'
 import { useI18n } from '../lib/i18n'
 
 type Props = {
@@ -15,7 +15,10 @@ type Props = {
 
 export default function CloseRegister({ session, orders, shop, cashierName, busy, onCancel, onClose }: Props) {
   const { t } = useI18n()
-  const sales = orders.reduce((s, o) => s + o.total, 0)
+  // Une commande annulée n'a pas laissé d'argent dans le tiroir.
+  const active = orders.filter(isActive)
+  const cancelled = orders.filter((o) => !isActive(o))
+  const sales = active.reduce((s, o) => s + o.total, 0)
   const expected = session.openingFloat + sales
   const [counted, setCounted] = useState(String(expected))
   const countedNum = Number(counted.replace(',', '.')) || 0
@@ -23,7 +26,7 @@ export default function CloseRegister({ session, orders, shop, cashierName, busy
 
   const perCashier = useMemo(() => {
     const map = new Map<string, { name: string; count: number; total: number }>()
-    orders.forEach((o) => {
+    active.forEach((o) => {
       const key = o.cashierId ?? o.cashierName
       const e = map.get(key) ?? { name: o.cashierName, count: 0, total: 0 }
       e.count += 1
@@ -31,7 +34,7 @@ export default function CloseRegister({ session, orders, shop, cashierName, busy
       map.set(key, e)
     })
     return Array.from(map.values()).sort((a, b) => b.total - a.total)
-  }, [orders])
+  }, [active])
 
   return (
     <div className="screen">
@@ -44,7 +47,7 @@ export default function CloseRegister({ session, orders, shop, cashierName, busy
         <div className="stats two">
           <div className="stat">
             <div className="k">{t('close_tickets')}</div>
-            <div className="v">{orders.length}</div>
+            <div className="v">{active.length}</div>
           </div>
           <div className="stat">
             <div className="k">{t('close_sales')}</div>
@@ -59,6 +62,15 @@ export default function CloseRegister({ session, orders, shop, cashierName, busy
             <div className="v" style={{ fontSize: 20 }}>{money(expected, shop.currency)}</div>
           </div>
         </div>
+
+        {cancelled.length > 0 && (
+          <div className="stat" style={{ marginBottom: 20 }}>
+            <div className="k">{t('stat_cancelled')}</div>
+            <div className="v red">
+              {cancelled.length} · {money(cancelled.reduce((s2, o) => s2 + o.total, 0), shop.currency)}
+            </div>
+          </div>
+        )}
 
         {perCashier.length > 0 && (
           <div className="list scroll-x" style={{ marginBottom: 20 }}>

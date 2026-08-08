@@ -1,5 +1,5 @@
 import type { Order, Session, Shop } from './types'
-import { dateFR, money } from './store'
+import { dateFR, isActive, money } from './store'
 import { getLang, translate } from './i18n'
 import { ticketBytes, zReportBytes } from './escpos'
 import { printerConfig, sendToPrinter } from './printer'
@@ -128,7 +128,9 @@ function browserZReport(
   shop: Shop,
   perCashier: { name: string; count: number; total: number }[],
 ) {
-  const total = orders.reduce((s, o) => s + o.total, 0)
+  const active = orders.filter(isActive)
+  const cancelled = orders.filter((o) => !isActive(o))
+  const total = active.reduce((s, o) => s + o.total, 0)
   const expected = session.openingFloat + total
   const counted = session.countedCash ?? expected
   const diff = counted - expected
@@ -147,7 +149,8 @@ function browserZReport(
      <div class="row muted"><span>${tp('tk_opened_by')}</span><span>${session.openedBy}</span></div>
      <div class="row muted"><span>${tp('tk_closed_by')}</span><span>${session.closedBy ?? '-'}</span></div>
      <div class="sep"></div>
-     <div class="row"><span>${tp('tk_count')}</span><span>${orders.length}</span></div>
+     <div class="row"><span>${tp('tk_count')}</span><span>${active.length}</span></div>
+     ${cancelled.length ? `<div class="row"><span>${tp('tk_cancelled')}</span><span>${cancelled.length} · ${money(cancelled.reduce((s2, o) => s2 + o.total, 0), shop.currency)}</span></div>` : ''}
      <div class="row"><span>${tp('tk_float')}</span><span>${money(session.openingFloat, shop.currency)}</span></div>
      <div class="row"><span>${tp('tk_sales')}</span><span>${money(total, shop.currency)}</span></div>
      <div class="sep"></div>

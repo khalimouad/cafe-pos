@@ -31,6 +31,8 @@ export type Order = {
   createdAt: string
   lines: OrderLine[]
   total: number
+  cancelledAt: string | null
+  cancelledBy: string | null
 }
 
 export type Session = {

@@ -48,7 +48,12 @@ vérifiés par la fonction `cafe_verify_pin`. Après 5 essais ratés, le profil 
 4. **Historique** — toutes les commandes, filtrables par session / jour / tout et par
    caissier, avec total encaissé, ticket moyen, répartition par caissier et réimpression
    d'un ticket.
-5. **Fermeture de caisse** — récapitulatif (tickets, ventes, fond de caisse, détail par
+5. **Annulation** — depuis l'historique, une commande de la caisse en cours peut être
+   annulée, mais **seul le responsable** peut le faire : il saisit son code à 4 chiffres,
+   vérifié en base. La commande n'est pas effacée : elle reste dans l'historique, barrée
+   et marquée « Annulée par … », et sort de tous les totaux comme du rapport Z, qui
+   compte les annulations à part.
+6. **Fermeture de caisse** — récapitulatif (tickets, ventes, fond de caisse, détail par
    caissier), saisie des espèces comptées, calcul de l'écart, puis impression du rapport Z.
 
 ## Plusieurs appareils, une seule caisse

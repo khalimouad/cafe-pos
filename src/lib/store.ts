@@ -70,7 +70,12 @@ const toOrder = (r: Row): Order => ({
   createdAt: String(r.created_at),
   lines: (r.lines as OrderLine[]) ?? [],
   total: Number(r.total),
+  cancelledAt: r.cancelled_at ? String(r.cancelled_at) : null,
+  cancelledBy: r.cancelled_by ? String(r.cancelled_by) : null,
 })
+
+/** Commandes qui comptent : une annulation sort des totaux mais reste à l'écran. */
+export const isActive = (o: Order) => !o.cancelledAt
 
 async function fetchAll(): Promise<DB> {
   const [shop, cashiers, products, sessions, orders] = await Promise.all([
@@ -196,6 +201,14 @@ function useActions(reload: () => Promise<void>) {
       if (error) throw error
       await reload()
       return toOrder(data)
+    },
+
+    // L'annulation est réservée au responsable : la base vérifie son code.
+    cancelOrder: async (orderId: string, pin: string) => {
+      const { data, error } = await supabase.rpc('cafe_cancel_order', { p_order_id: orderId, p_pin: pin })
+      if (error) throw error
+      await reload()
+      return String(data)
     },
 
     updateShop: async (patch: Partial<Shop>) => {
