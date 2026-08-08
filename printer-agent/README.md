@@ -125,6 +125,12 @@ lpadmin -p POS80 -E -v usb://... -m raw     # lpinfo -v liste les URI USB
 
 ## Réglage dans le POS
 
+L'écran ne demande plus que deux choses : **Impression directe : Oui** et le **partage
+Windows** de l'imprimante (ex. `\\DESKTOP-HTHBEJC\printer WD8260`). L'adresse de
+l'agent est déduite de la page. Les autres branchements — réseau, USB direct, CUPS —
+restent gérés par l'agent sans encombrer l'écran ; ils se règlent en base au besoin
+(`printer_transport`, `printer_ip`, `printer_port`).
+
 **Réglages → Imprimante ticket** : activer l'impression directe, choisir le
 **branchement** (réseau, USB, CUPS ou partage Windows), renseigner l'adresse de l'agent
 (`http://127.0.0.1:7777` sur le poste lui-même, ou `http://IP-DU-POSTE:7777` depuis un

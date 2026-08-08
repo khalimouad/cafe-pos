@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { PrinterTransport, Shop } from '../lib/types'
+import type { Shop } from '../lib/types'
 import { testBytes } from '../lib/escpos'
 import { mixedContentBlocked, pingPrinter, printerConfig, sendToPrinter } from '../lib/printer'
 import { useI18n } from '../lib/i18n'
@@ -10,17 +10,18 @@ type Props = {
   updateShop: (patch: Partial<Shop>) => Promise<void>
 }
 
-const TRANSPORTS: PrinterTransport[] = ['tcp', 'usb', 'cups', 'windows']
-
+/**
+ * Réglage de l'imprimante réduit à l'essentiel : le ticket part sur l'imprimante
+ * partagée par Windows. Les autres branchements (réseau, USB direct, CUPS) restent
+ * gérés par l'agent, mais n'encombrent plus l'écran.
+ */
 export default function PrinterSettings({ shop, updateShop }: Props) {
   const { t } = useI18n()
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
-  const [devices, setDevices] = useState<string[]>([])
-  const [winPrinters, setWinPrinters] = useState<string[]>([])
+  const [shares, setShares] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
   const cfg = printerConfig(shop)
-  const network = shop.printerTransport === 'tcp'
 
   // « Failed to fetch » ne dit pas pourquoi : on nomme la cause quand on la connaît.
   const diagnose = (e: unknown) => {
@@ -34,8 +35,7 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
     setStatus(null)
     try {
       const r = await pingPrinter(cfg)
-      setDevices(r.usbDevices ?? [])
-      setWinPrinters(r.windowsPrinters ?? [])
+      setShares(r.windowsPrinters ?? [])
       setStatus(
         r.printer
           ? { ok: true, text: t('printer_ok', { target: r.target ?? '' }) }
@@ -67,24 +67,10 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
     </button>
   )
 
-  const text = (key: 'printerAgentUrl' | 'printerIp' | 'printerTarget', numeric = false) => (
-    <input
-      className="input"
-      dir="ltr"
-      inputMode={numeric ? 'numeric' : 'text'}
-      defaultValue={String(shop[key])}
-      key={`${key}-${shop[key]}`}
-      onBlur={(e) => {
-        const v = e.target.value.trim()
-        if (v !== shop[key]) void updateShop({ [key]: v })
-      }}
-    />
-  )
-
   return (
     <>
       <h2 className="section">{t('printer_title')}</h2>
-      <p className="sub">{t('printer_sub')}</p>
+      <p className="sub">{t('printer_sub_share')}</p>
 
       <div className="list pad" style={{ marginBottom: 16 }}>
         <div className="stats" style={{ margin: 0 }}>
@@ -93,64 +79,25 @@ export default function PrinterSettings({ shop, updateShop }: Props) {
             {toggle('printerEnabled')}
           </div>
 
-          <div className="field" style={{ margin: 0 }}>
-            <label>{t('printer_transport')}</label>
-            <select
+          <div className="field" style={{ margin: 0, gridColumn: 'span 2' }}>
+            <label>{t('printer_share')}</label>
+            <input
               className="input"
-              value={shop.printerTransport}
-              onChange={(e) => void updateShop({ printerTransport: e.target.value as PrinterTransport })}
-            >
-              {TRANSPORTS.map((tr) => (
-                <option key={tr} value={tr}>{t(`printer_transport_${tr}`)}</option>
-              ))}
-            </select>
+              dir="ltr"
+              key={`target-${shop.printerTarget}`}
+              defaultValue={shop.printerTarget}
+              placeholder="\\DESKTOP-XXXX\POS80"
+              onBlur={(e) => {
+                const v = e.target.value.trim()
+                if (v !== shop.printerTarget) void updateShop({ printerTarget: v, printerTransport: 'windows' })
+              }}
+            />
+            {shares.length > 0 && (
+              <p className="sub" style={{ margin: '6px 0 0' }}>
+                {t('printer_windows_list', { list: shares.join(', ') })}
+              </p>
+            )}
           </div>
-
-          <div className="field" style={{ margin: 0 }}>
-            <label>{t('printer_agent_url')}</label>
-            {text('printerAgentUrl')}
-            <p className="sub" style={{ margin: '6px 0 0' }}>
-              {t('printer_agent_hint', { url: cfg.agentUrl })}
-            </p>
-          </div>
-
-          {network ? (
-            <>
-              <div className="field" style={{ margin: 0 }}>
-                <label>{t('printer_ip')}</label>
-                {text('printerIp')}
-              </div>
-              <div className="field" style={{ margin: 0 }}>
-                <label>{t('printer_port')}</label>
-                <input
-                  className="input"
-                  dir="ltr"
-                  inputMode="numeric"
-                  key={`port-${shop.printerPort}`}
-                  defaultValue={String(shop.printerPort)}
-                  onBlur={(e) => {
-                    const port = Number(e.target.value)
-                    if (port > 0 && port !== shop.printerPort) void updateShop({ printerPort: port })
-                  }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="field" style={{ margin: 0 }}>
-              <label>{t(`printer_target_${shop.printerTransport}`)}</label>
-              {text('printerTarget')}
-              {shop.printerTransport === 'usb' && devices.length > 0 && (
-                <p className="sub" style={{ margin: '6px 0 0' }}>
-                  {t('printer_devices', { list: devices.join(', ') })}
-                </p>
-              )}
-              {shop.printerTransport === 'windows' && winPrinters.length > 0 && (
-                <p className="sub" style={{ margin: '6px 0 0' }}>
-                  {t('printer_windows_list', { list: winPrinters.join(', ') })}
-                </p>
-              )}
-            </div>
-          )}
 
           <div className="field" style={{ margin: 0 }}>
             <label>{t('printer_cut')}</label>
